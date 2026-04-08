@@ -6,6 +6,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     Float,
+    ForeignKey,
     Integer,
     LargeBinary,
     String,
@@ -32,10 +33,27 @@ class Admin(Base):
         return f"<Admin(id={self.id}, username='{self.username}')>"
 
 
+class AdminInviteCode(Base):
+    __tablename__ = "admin_invite_codes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(32), unique=True, nullable=False, index=True)
+    created_by = Column(Integer, ForeignKey("admins.id"), nullable=True)
+    used_by = Column(Integer, nullable=True)
+    used_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    is_used = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<AdminInviteCode(id={self.id}, code='{self.code}', is_used={self.is_used})>"
+
+
 class Employee(Base):
     __tablename__ = "employees"
 
     id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(String(50), default="", index=True)
     username = Column(String(150), nullable=False, index=True)
     email = Column(String(100), default="")
     phone = Column(String(30), default="")
