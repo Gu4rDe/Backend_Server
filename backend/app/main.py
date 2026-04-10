@@ -1,7 +1,8 @@
 import os
+import secrets
 import shutil
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Annotated
 
 import cv2
@@ -16,7 +17,7 @@ load_dotenv()
 
 from .auth import create_access_token, get_current_admin, hash_password, verify_password
 from .database import get_db, init_db
-from .models import Admin, AppSettings, Employee
+from .models import Admin, AdminInviteCode, AppSettings, Employee
 from .schemas import (
     AdminLogin,
     AdminRegister,
@@ -25,6 +26,9 @@ from .schemas import (
     EmployeeResponse,
     EmployeeStats,
     EmployeeUpdate,
+    InviteCodeCreate,
+    InviteCodeListResponse,
+    InviteCodeResponse,
     SettingsResponse,
     SettingsUpdate,
     TokenResponse,
@@ -100,6 +104,35 @@ async def register_admin(
             status_code=400, detail="Username or email already registered"
         )
 
+    admin_count = db.query(Admin).count()
+
+    if admin_count == 0:
+        initial_invite_code = os.getenv("INITIAL_INVITE_CODE", "")
+        if initial_invite_code and admin_data.invite_code != initial_invite_code:
+            raise HTTPException(status_code=403, detail="Invalid initial invite code")
+    else:
+        invite_code = (
+            db.query(AdminInviteCode)
+            .filter(AdminInviteCode.code == admin_data.invite_code)
+            .first()
+        )
+
+        if not invite_code:
+            raise HTTPException(
+                status_code=403, detail="Invalid or expired invite code"
+            )
+
+        if invite_code.is_used:
+            raise HTTPException(
+                status_code=403, detail="Invite code has already been used"
+            )
+
+        if invite_code.expires_at and invite_code.expires_at < datetime.utcnow():
+            raise HTTPException(status_code=403, detail="Invite code has expired")
+
+        invite_code.is_used = True
+        invite_code.used_at = datetime.utcnow()
+
     new_admin = Admin(
         username=admin_data.username,
         email=admin_data.email,
@@ -108,6 +141,11 @@ async def register_admin(
     db.add(new_admin)
     db.commit()
     db.refresh(new_admin)
+
+    if admin_count > 0 and invite_code:
+        invite_code.used_by = new_admin.id
+        db.commit()
+
     return new_admin
 
 
@@ -126,9 +164,59 @@ async def get_me(current_admin: Annotated[Admin, Depends(get_current_admin)]):
     return current_admin
 
 
+@app.post("/api/v1/admin/invites", response_model=InviteCodeResponse)
+async def create_invite_code(
+    invite_data: InviteCodeCreate,
+    db: Annotated[Session, Depends(get_db)],
+    current_admin: Annotated[Admin, Depends(get_current_admin)],
+):
+    code = secrets.token_urlsafe(16)[:16]
+    expires_at = datetime.utcnow() + timedelta(hours=invite_data.expires_hours)
+
+    invite_code = AdminInviteCode(
+        code=code,
+        created_by=current_admin.id,
+        expires_at=expires_at,
+    )
+    db.add(invite_code)
+    db.commit()
+    db.refresh(invite_code)
+    return invite_code
+
+
+@app.get("/api/v1/admin/invites", response_model=InviteCodeListResponse)
+async def list_invite_codes(
+    db: Annotated[Session, Depends(get_db)],
+    current_admin: Annotated[Admin, Depends(get_current_admin)],
+):
+    codes = db.query(AdminInviteCode).all()
+    return InviteCodeListResponse(codes=codes, total=len(codes))
+
+
+@app.delete("/api/v1/admin/invites/{code_id}")
+async def delete_invite_code(
+    code_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_admin: Annotated[Admin, Depends(get_current_admin)],
+):
+    invite_code = (
+        db.query(AdminInviteCode).filter(AdminInviteCode.id == code_id).first()
+    )
+    if not invite_code:
+        raise HTTPException(status_code=404, detail="Invite code not found")
+
+    if invite_code.is_used:
+        raise HTTPException(status_code=400, detail="Cannot delete used invite code")
+
+    db.delete(invite_code)
+    db.commit()
+    return {"message": f"Invite code {code_id} deleted successfully"}
+
+
 @app.post("/api/v1/employees/register", response_model=EmployeeResponse)
 async def register_employee(
     username: str = Form(...),
+    employee_id: str = Form(""),
     email: str = Form(""),
     phone: str = Form(""),
     department: str = Form(""),
@@ -141,6 +229,16 @@ async def register_employee(
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
 ):
+    if employee_id:
+        existing_employee_id = (
+            db.query(Employee).filter(Employee.employee_id == employee_id).first()
+        )
+        if existing_employee_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Employee with this employee_id already exists",
+            )
+
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
 
@@ -179,6 +277,7 @@ async def register_employee(
             )
 
         employee = Employee(
+            employee_id=employee_id,
             username=username,
             email=email,
             phone=phone,

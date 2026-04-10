@@ -7,6 +7,7 @@ class AdminRegister(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     email: str
     password: str = Field(..., min_length=6, max_length=128)
+    invite_code: str = Field(..., min_length=8, max_length=32)
 
 
 class AdminLogin(BaseModel):
@@ -29,6 +30,7 @@ class TokenResponse(BaseModel):
 
 
 class EmployeeCreate(BaseModel):
+    employee_id: str = ""
     username: str
     email: str = ""
     phone: str = ""
@@ -41,6 +43,7 @@ class EmployeeCreate(BaseModel):
 
 
 class EmployeeUpdate(BaseModel):
+    employee_id: str | None = None
     username: str | None = None
     email: str | None = None
     phone: str | None = None
@@ -56,6 +59,7 @@ class EmployeeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    employee_id: str = ""
     username: str
     email: str = ""
     phone: str = ""
@@ -104,3 +108,23 @@ class SettingsUpdate(BaseModel):
     auto_backup: bool | None = None
     backend_url: str | None = None
     connection_timeout: int | None = None
+
+
+class InviteCodeCreate(BaseModel):
+    expires_hours: int = 24
+
+
+class InviteCodeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    code: str
+    created_by: int | None
+    expires_at: datetime | None
+    is_used: bool
+    created_at: datetime
+
+
+class InviteCodeListResponse(BaseModel):
+    codes: list[InviteCodeResponse]
+    total: int
