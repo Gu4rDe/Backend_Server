@@ -27,19 +27,21 @@
 
 ```
 Project/
-├── BackendApps/
+├── backend/              # FastAPI приложение
 │   ├── app/
-│   │   ├── main.py          # FastAPI приложение
+│   │   ├── main.py      # FastAPI приложение
 │   │   ├── auth.py
 │   │   ├── database.py
 │   │   ├── models.py
 │   │   ├── schemas.py
 │   │   └── services/
-│   └── pyproject.toml       # Зависимости бэкенда
-└── FrontendApps/
-    ├── config.py            # API_BASE_URL
-    └── core/
-        └── api_client.py    # HTTP клиент
+│   ├── pyproject.toml   # Зависимости бэкенда
+│   └── .env             # Конфигурация
+└── frontend/            # Desktop приложение
+    ├── core/
+    │   └── api_client.py
+    ├── ui/
+    └── .env             # API_BASE_URL
 ```
 
 ---
@@ -82,23 +84,24 @@ sudo useradd -r -m -s /bin/bash faceapi
 ### Копирование проекта на сервер
 
 ```bash
-# Скопируйте BackendApps на сервер
+# Скопируйте backend и frontend на сервер
 sudo mkdir -p /opt/faceapi
-sudo cp -r BackendApps /opt/faceapi/
+sudo cp -r backend /opt/faceapi/
+sudo cp -r frontend /opt/faceapi/
 sudo chown -R faceapi:faceapi /opt/faceapi
 ```
 
 ### Создание виртуального окружения
 
 ```bash
-sudo -u faceapi python3 -m venv /opt/faceapi/BackendApps/.venv
+sudo -u faceapi python3 -m venv /opt/faceapi/backend/.venv
 ```
 
 ### Установка зависимостей
 
 ```bash
-sudo -u faceapi /opt/faceapi/BackendApps/.venv/bin/pip install --upgrade pip
-sudo -u faceapi /opt/faceapi/BackendApps/.venv/bin/pip install \
+sudo -u faceapi /opt/faceapi/backend/.venv/bin/pip install --upgrade pip
+sudo -u faceapi /opt/faceapi/backend/.venv/bin/pip install \
     bcrypt==4.0.1 \
     "fastapi>=0.110.0" \
     mediapipe==0.10.9 \
@@ -116,7 +119,7 @@ sudo -u faceapi /opt/faceapi/BackendApps/.venv/bin/pip install \
 ### Настройка .env
 
 ```bash
-sudo -u faceapi nano /opt/faceapi/BackendApps/.env
+sudo -u faceapi nano /opt/faceapi/backend/.env
 ```
 
 ```env
@@ -131,9 +134,22 @@ CORS_ORIGINS=https://your-domain.com
 ### Создание директории для данных
 
 ```bash
-sudo -u faceapi mkdir -p /opt/faceapi/BackendApps/data
-sudo -u faceapi mkdir -p /opt/faceapi/BackendApps/models
+sudo -u faceapi mkdir -p /opt/faceapi/backend/data
+sudo -u faceapi mkdir -p /opt/faceapi/backend/models
 ```
+
+### Загрузка модели распознавания лиц
+
+Для работы распознавания лиц скачайте ArcFace ONNX модель:
+
+```bash
+cd /opt/faceapi/backend/models
+
+# Скачайте ArcFace модель
+sudo -u faceapi curl -L -o arcface.onnx "https://huggingface.co/garavv/arcface-onnx/resolve/main/arc.onnx?download=true"
+```
+
+Подробнее о моделях см. [MODELS.md](MODELS.md).
 
 ---
 
@@ -154,9 +170,9 @@ After=network.target
 Type=simple
 User=faceapi
 Group=faceapi
-WorkingDirectory=/opt/faceapi/BackendApps
-Environment="PATH=/opt/faceapi/BackendApps/.venv/bin"
-ExecStart=/opt/faceapi/BackendApps/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+WorkingDirectory=/opt/faceapi/backend
+Environment="PATH=/opt/faceapi/backend/.venv/bin"
+ExecStart=/opt/faceapi/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -389,33 +405,25 @@ To                         Action      From
 
 ## 8. Настройка фронтенда на клиентских машинах
 
-На каждой клиентской машине, где установлен `FrontendApps`:
+На каждой клиентской машине, где установлен `frontend`:
 
-### Шаг 1: Обновить config.py
+### Шаг 1: Обновите .env
 
-Откройте `FrontendApps/config.py` и измените строку 7:
+Создайте или отредактируйте файл `frontend/.env`:
 
-```python
-# Было:
-API_BASE_URL = "http://localhost:8000"
-
-# Стало:
-API_BASE_URL = "https://your-domain.com"
+```env
+API_BASE_URL=https://your-domain.com
 ```
 
-### Шаг 2: Обновить api_client.py
+### Шаг 2: Запустите приложение
 
-Откройте `FrontendApps/core/api_client.py` и измените строку 6:
-
-```python
-# Было:
-def __init__(self, base_url: str = "http://localhost:8000"):
-
-# Стало:
-def __init__(self, base_url: str = "https://your-domain.com"):
+```bash
+cd frontend
+uv sync
+uv run python main.py
 ```
 
-> **Примечание:** Если `API_BASE_URL` передаётся через переменную окружения или `config.json`, достаточно изменить только их — дефолт в `api_client.py` используется как fallback.
+> **Примечание:** Для HTTPS подключения убедитесь что на сервере настроен валидный SSL-сертификат.
 
 ---
 
@@ -461,7 +469,7 @@ curl -vI https://your-domain.com 2>&1 | grep -E "SSL|subject|expire"
 
 ### Проверка фронтенда
 
-Запустите `FrontendApps` на клиентской машине и проверьте:
+Запустите `frontend` на клиентской машине и проверьте:
 - Подключение к серверу (health check должен проходить)
 - Авторизация администратора
 - Регистрация сотрудника
@@ -498,13 +506,13 @@ GRANT ALL PRIVILEGES ON DATABASE faceapi_db TO faceapi;
 ### Установка Python-драйвера
 
 ```bash
-sudo -u faceapi /opt/faceapi/BackendApps/.venv/bin/pip install psycopg2-binary
+sudo -u faceapi /opt/faceapi/backend/.venv/bin/pip install psycopg2-binary
 ```
 
 ### Обновление .env
 
 ```bash
-sudo -u faceapi nano /opt/faceapi/BackendApps/.env
+sudo -u faceapi nano /opt/faceapi/backend/.env
 ```
 
 ```env
@@ -524,11 +532,11 @@ CORS_ORIGINS=https://your-domain.com
 
 ```bash
 # 1. Экспорт из SQLite
-sudo -u faceapi /opt/faceapi/BackendApps/.venv/bin/python3 -c "
+sudo -u faceapi /opt/faceapi/backend/.venv/bin/python3 -c "
 import sqlite3
 import json
 
-conn = sqlite3.connect('/opt/faceapi/BackendApps/data/faces.db')
+conn = sqlite3.connect('/opt/faceapi/backend/data/faces.db')
 conn.row_factory = sqlite3.Row
 cursor = conn.cursor()
 
@@ -606,12 +614,12 @@ uvicorn app.main:app \
 
 ### Настройка фронтенда для локальной разработки
 
-```python
-# FrontendApps/config.py
-API_BASE_URL = "https://localhost:8000"
+```env
+# frontend/.env
+API_BASE_URL="https://localhost:8000"
 ```
 
-> **Преимущество mkcert:** Сертификат доверенный, `verify=False` в `requests` не нужен.
+> **Преимущество mkcert:** Сертификат доверенный, `verify=False` в HTTP клиенте не нужен.
 
 ---
 
