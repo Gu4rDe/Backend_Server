@@ -105,16 +105,15 @@ async def register_admin(
             status_code=400, detail="Username or email already registered"
         )
 
-    initial_invite_code = os.getenv("INITIAL_INVITE_CODE", "")
-    db_invite_code = None
+    initial_invite_code = os.getenv("INITIAL_INVITE_CODE", "").strip()
 
-    if initial_invite_code:
-        if admin_data.invite_code != initial_invite_code:
-            raise HTTPException(status_code=403, detail="Invalid invite code")
-    else:
+    if not initial_invite_code:
         raise HTTPException(
             status_code=403, detail="Registration is closed. Contact administrator."
         )
+
+    if admin_data.invite_code != initial_invite_code:
+        raise HTTPException(status_code=403, detail="Invalid invite code")
 
     new_admin = Admin(
         username=admin_data.username,
