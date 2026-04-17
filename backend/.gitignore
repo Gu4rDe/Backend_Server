@@ -8,3 +8,10 @@ __pycache__/
 *.sqlite
 *.sqlite3
 .DS_Store
+models/*.onnx
+models/*.pth
+models/*.pt
+models/*.pb
+models/*.bin
+models/*.caffemodel
+models/*.weights
