@@ -38,7 +38,7 @@ class AdminInviteCode(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     code = Column(String(32), unique=True, nullable=False, index=True)
-    created_by = Column(Integer, ForeignKey("admins.id"), nullable=True)
+    created_by = Column(Integer, ForeignKey("admins.id", ondelete="CASCADE"), nullable=True)
     used_by = Column(Integer, nullable=True)
     used_at = Column(DateTime, nullable=True)
     expires_at = Column(DateTime, nullable=True)
