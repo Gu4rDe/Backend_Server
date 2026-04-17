@@ -31,6 +31,14 @@ def decode_image(contents: bytes) -> np.ndarray:
     return img
 
 
+def sanitize_string(value: str, max_length: int = 255) -> str:
+    """Sanitize and truncate string input."""
+    if not value:
+        return ""
+    # Remove leading/trailing whitespace and truncate
+    return value.strip()[:max_length]
+
+
 @router.post("/employees/register", response_model=EmployeeResponse)
 async def register_employee(
     username: str = Form(...),
@@ -47,6 +55,16 @@ async def register_employee(
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
 ):
+    # Sanitize inputs
+    username = sanitize_string(username, 150)
+    employee_id = sanitize_string(employee_id, 50)
+    email = sanitize_string(email, 100).lower()
+    phone = sanitize_string(phone, 30)
+    department = sanitize_string(department, 100)
+    position = sanitize_string(position, 100)
+    location = sanitize_string(location, 100)
+    hire_date = sanitize_string(hire_date, 20)
+    
     if employee_id:
         existing_employee_id = (
             db.query(Employee).filter(Employee.employee_id == employee_id).first()
@@ -138,6 +156,8 @@ async def search_employees(
     db: Annotated[Session, Depends(get_db)],
     current_admin: Annotated[Admin, Depends(get_current_admin)],
 ):
+    # Sanitize search query
+    q = sanitize_string(q, 100)
     pattern = f"%{q}%"
     employees = (
         db.query(Employee)

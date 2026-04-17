@@ -3,7 +3,9 @@ import secrets
 from datetime import datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from ..auth import create_access_token, get_current_admin, hash_password, verify_password
@@ -20,16 +22,23 @@ from ..schemas import (
 )
 
 router = APIRouter(prefix="/api/v1", tags=["admins"])
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/admins/register", response_model=AdminResponse)
+@limiter.limit("5/minute")
 async def register_admin(
+    request: Request,
     admin_data: AdminRegister, db: Annotated[Session, Depends(get_db)]
 ):
+    # Sanitize inputs
+    username = admin_data.username.strip()
+    email = admin_data.email.strip().lower()
+    
     existing = (
         db.query(Admin)
         .filter(
-            (Admin.username == admin_data.username) | (Admin.email == admin_data.email)
+            (Admin.username == username) | (Admin.email == email)
         )
         .first()
     )
@@ -49,8 +58,8 @@ async def register_admin(
         raise HTTPException(status_code=403, detail="Invalid invite code")
 
     new_admin = Admin(
-        username=admin_data.username,
-        email=admin_data.email,
+        username=username,
+        email=email,
         password_hash=hash_password(admin_data.password),
     )
     db.add(new_admin)
@@ -61,8 +70,15 @@ async def register_admin(
 
 
 @router.post("/admins/login", response_model=TokenResponse)
-async def login(admin_data: AdminLogin, db: Annotated[Session, Depends(get_db)]):
-    admin = db.query(Admin).filter(Admin.username == admin_data.username).first()
+@limiter.limit("10/minute")
+async def login(
+    request: Request,
+    admin_data: AdminLogin, db: Annotated[Session, Depends(get_db)]
+):
+    # Sanitize inputs
+    username = admin_data.username.strip()
+    
+    admin = db.query(Admin).filter(Admin.username == username).first()
     if not admin or not verify_password(admin_data.password, admin.password_hash):
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
