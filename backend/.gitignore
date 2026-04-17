@@ -1,47 +1,10 @@
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-*.egg-info/
-dist/
-build/
-.eggs/
-*.egg
-
-# Virtual environments
-venv/
-env/
 .venv/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Database
-data/*.db
-*.db
-
-# Environment
+__pycache__/
+*.pyc
+*.pyo
 .env
-
-# OS
+.env.local
+*.db
+*.sqlite
+*.sqlite3
 .DS_Store
-Thumbs.db
-
-# Models (large binary files)
-models/*.caffemodel
-models/*.onnx
-models/*.pth
-models/*.pt
-models/*.pb
-models/*.bin
-models/*.weights
-
-# Logs
-*.log
-
-# Ruff cache
-.ruff_cache/

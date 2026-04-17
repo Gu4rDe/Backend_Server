@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 load_dotenv()
 
 from .auth import create_access_token, get_current_admin, hash_password, verify_password
-from .database import get_db, init_db
+from .database import ensure_env_file, get_db, init_db
 from .models import Admin, AdminInviteCode, AppSettings, Employee
 from .schemas import (
     AdminLogin,
@@ -42,6 +42,7 @@ face_service = FaceRecognitionService(model_dir=os.getenv("MODEL_DIR", "models")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    ensure_env_file()
     init_db()
     db = next(get_db())
     if db.query(AppSettings).first() is None:
@@ -104,34 +105,16 @@ async def register_admin(
             status_code=400, detail="Username or email already registered"
         )
 
-    admin_count = db.query(Admin).count()
+    initial_invite_code = os.getenv("INITIAL_INVITE_CODE", "")
+    db_invite_code = None
 
-    if admin_count == 0:
-        initial_invite_code = os.getenv("INITIAL_INVITE_CODE", "")
-        if initial_invite_code and admin_data.invite_code != initial_invite_code:
-            raise HTTPException(status_code=403, detail="Invalid initial invite code")
+    if initial_invite_code:
+        if admin_data.invite_code != initial_invite_code:
+            raise HTTPException(status_code=403, detail="Invalid invite code")
     else:
-        invite_code = (
-            db.query(AdminInviteCode)
-            .filter(AdminInviteCode.code == admin_data.invite_code)
-            .first()
+        raise HTTPException(
+            status_code=403, detail="Registration is closed. Contact administrator."
         )
-
-        if not invite_code:
-            raise HTTPException(
-                status_code=403, detail="Invalid or expired invite code"
-            )
-
-        if invite_code.is_used:
-            raise HTTPException(
-                status_code=403, detail="Invite code has already been used"
-            )
-
-        if invite_code.expires_at and invite_code.expires_at < datetime.utcnow():
-            raise HTTPException(status_code=403, detail="Invite code has expired")
-
-        invite_code.is_used = True
-        invite_code.used_at = datetime.utcnow()
 
     new_admin = Admin(
         username=admin_data.username,
@@ -141,10 +124,6 @@ async def register_admin(
     db.add(new_admin)
     db.commit()
     db.refresh(new_admin)
-
-    if admin_count > 0 and invite_code:
-        invite_code.used_by = new_admin.id
-        db.commit()
 
     return new_admin
 
@@ -442,6 +421,14 @@ async def recognize_file(
                         {
                             "id": record.id,
                             "username": record.username,
+                            "position": record.position or "",
+                            "department": record.department or "",
+                            "email": record.email or "",
+                            "phone": record.phone or "",
+                            "location": record.location or "",
+                            "hire_date": record.hire_date or "",
+                            "is_active": record.is_active,
+                            "access_enabled": record.access_enabled,
                             "similarity": float(similarity),
                         }
                     )
