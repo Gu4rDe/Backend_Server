@@ -1,13 +1,23 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class AdminRegister(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
-    email: str
+    email: EmailStr
     password: str = Field(..., min_length=6, max_length=128)
     invite_code: str = Field(..., min_length=8, max_length=32)
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        return v.strip()
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        return v.strip().lower()
 
 
 class AdminLogin(BaseModel):
@@ -53,6 +63,20 @@ class EmployeeUpdate(BaseModel):
     hire_date: str | None = None
     is_active: bool | None = None
     access_enabled: bool | None = None
+
+    @field_validator("username", "employee_id", "phone", "department", "position", "location", "hire_date")
+    @classmethod
+    def validate_string_fields(cls, v: str | None) -> str | None:
+        if v is not None:
+            return v.strip()
+        return v
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str | None) -> str | None:
+        if v is not None:
+            return v.strip().lower()
+        return v
 
 
 class EmployeeResponse(BaseModel):
