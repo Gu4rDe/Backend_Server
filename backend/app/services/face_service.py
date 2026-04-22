@@ -6,6 +6,11 @@ import cv2
 import mediapipe as mp
 import numpy as np
 
+try:
+    import onnxruntime as ort
+except ImportError:
+    ort = None
+
 
 MODEL_URL = (
     "https://huggingface.co/garavv/arcface-onnx/resolve/main/arc.onnx?download=true"
@@ -40,15 +45,21 @@ class FaceRecognitionService:
             model_selection=0, min_detection_confidence=0.5
         )
         self.embedding_size = 512
-        self.embedding_net = None
+        self.session = None
+        self._input_name = None
 
         embedding_model_path = os.path.join(model_dir, "arcface.onnx")
         self._load_model(embedding_model_path, auto_download)
 
     def _load_model(self, model_path: str, auto_download: bool) -> None:
+        if ort is None:
+            print("WARNING: onnxruntime not installed, falling back to histogram-based face recognition")
+            return
+
         if os.path.exists(model_path):
             try:
-                self.embedding_net = cv2.dnn.readNetFromONNX(model_path)
+                self.session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+                self._input_name = self.session.get_inputs()[0].name
                 print(f"ArcFace model loaded from {model_path}")
                 return
             except Exception as e:
@@ -58,7 +69,8 @@ class FaceRecognitionService:
         if auto_download:
             if download_model(self.model_dir):
                 try:
-                    self.embedding_net = cv2.dnn.readNetFromONNX(model_path)
+                    self.session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+                    self._input_name = self.session.get_inputs()[0].name
                     print(f"ArcFace model loaded from {model_path}")
                     return
                 except Exception as e:
@@ -67,6 +79,18 @@ class FaceRecognitionService:
         print(
             f"WARNING: ArcFace model not available, using fallback histogram method"
         )
+
+    @property
+    def model_name(self) -> str:
+        return "arcface_onnx" if self.session is not None else "histogram_fallback"
+
+    @property
+    def model_status(self) -> str:
+        if self.session is not None:
+            model_path = os.path.join(self.model_dir, "arcface.onnx")
+            return f"ArcFace ONNX (512-dim) loaded from {model_path}"
+        else:
+            return "Histogram fallback (64-bin grayscale) — ArcFace model unavailable"
 
     def detect_faces(
         self, image: np.ndarray, conf_threshold: float = 0.5
@@ -105,15 +129,14 @@ class FaceRecognitionService:
             return None
 
         try:
-            if self.embedding_net is not None:
+            if self.session is not None:
                 face_resized = cv2.resize(face_image, (112, 112))
                 face_rgb = cv2.cvtColor(face_resized, cv2.COLOR_BGR2RGB)
                 face_float = face_rgb.astype(np.float32)
                 face_normalized = (face_float - 127.5) / 128.0
                 input_blob = face_normalized[np.newaxis, ...]
-                self.embedding_net.setInput(input_blob)
-                embedding = self.embedding_net.forward()
-                embedding = embedding.flatten()
+                outputs = self.session.run(None, {self._input_name: input_blob})
+                embedding = outputs[0].flatten()
                 norm = np.linalg.norm(embedding)
                 if norm > 0:
                     embedding = embedding / norm

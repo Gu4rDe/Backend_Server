@@ -44,6 +44,9 @@ async def lifespan(app: FastAPI):
         db.commit()
         logger.info("Default settings created")
 
+    from .routers.faces import face_service
+
+    logger.info(f"Face recognition: {face_service.model_status}")
     logger.info("Face Recognition API starting up...")
     yield
     logger.info("Face Recognition API shutting down...")
