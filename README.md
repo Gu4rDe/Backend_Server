@@ -51,12 +51,12 @@ backend/
 
 ### Переменные окружения
 
-| Переменная | Описание | По умолчанию |
-|------------|----------|--------------|
-| `SECRET_KEY` | Секретный ключ для JWT токенов | auto-generated |
-| `DATABASE_URL` | URL базы данных | `sqlite:///./data/faces.db` |
-| `MODEL_DIR` | Папка с моделями распознавания лиц | `models` |
-| `INITIAL_INVITE_CODE` | Код для регистрации админов | auto-generated |
+| Переменная            | Описание                           | По умолчанию                |
+| --------------------- | ---------------------------------- | --------------------------- |
+| `SECRET_KEY`          | Секретный ключ для JWT токенов     | auto-generated              |
+| `DATABASE_URL`        | URL базы данных                    | `sqlite:///./data/faces.db` |
+| `MODEL_DIR`           | Папка с моделями распознавания лиц | `models`                    |
+| `INITIAL_INVITE_CODE` | Код для регистрации админов        | auto-generated              |
 
 Подробнее: [](../README.md#конфигурация)
 
@@ -75,7 +75,5 @@ backend/
 - PostgreSQL миграция
 
 ## Связанные документы
-
-- [](../README.md) — Общая документация проекта
-- [MODELS.md](MODELS.md) — Модели распознавания
-- [BACKEND_SETUP.md](BACKEND_SETUP.md) — Развёртывание на сервере
+- [MODELS.md](/backend/MODELS.md) — Модели распознавания
+- [BACKEND_SETUP.md](/backend/BACKEND_SETUP.md) — Развёртывание на сервере
