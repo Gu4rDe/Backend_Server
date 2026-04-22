@@ -40,22 +40,33 @@ class FaceRecognitionService:
             model_selection=0, min_detection_confidence=0.5
         )
         self.embedding_size = 512
+        self.embedding_net = None
 
         embedding_model_path = os.path.join(model_dir, "arcface.onnx")
-        if os.path.exists(embedding_model_path):
-            self.embedding_net = cv2.dnn.readNetFromONNX(embedding_model_path)
-            print(f"ArcFace model loaded from {embedding_model_path}")
-        elif auto_download:
-            if download_model(model_dir):
-                self.embedding_net = cv2.dnn.readNetFromONNX(embedding_model_path)
-                print(f"ArcFace model loaded from {embedding_model_path}")
-            else:
-                self.embedding_net = None
-        else:
-            self.embedding_net = None
-            print(
-                f"WARNING: ArcFace model not found at {embedding_model_path}, using fallback histogram method"
-            )
+        self._load_model(embedding_model_path, auto_download)
+
+    def _load_model(self, model_path: str, auto_download: bool) -> None:
+        if os.path.exists(model_path):
+            try:
+                self.embedding_net = cv2.dnn.readNetFromONNX(model_path)
+                print(f"ArcFace model loaded from {model_path}")
+                return
+            except Exception as e:
+                print(f"WARNING: Failed to load ArcFace model from {model_path}: {e}")
+                print("Falling back to histogram-based face recognition")
+
+        if auto_download:
+            if download_model(self.model_dir):
+                try:
+                    self.embedding_net = cv2.dnn.readNetFromONNX(model_path)
+                    print(f"ArcFace model loaded from {model_path}")
+                    return
+                except Exception as e:
+                    print(f"WARNING: Downloaded model failed to load: {e}")
+
+        print(
+            f"WARNING: ArcFace model not available, using fallback histogram method"
+        )
 
     def detect_faces(
         self, image: np.ndarray, conf_threshold: float = 0.5

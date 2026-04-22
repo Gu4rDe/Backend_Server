@@ -1,0 +1,30 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: face-recognition-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - face-data:/app/data
+      - face-models:/app/models
+    environment:
+      - DATABASE_URL=sqlite:///./data/faces.db
+      - MODEL_DIR=models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  face-data:
+  face-models:

@@ -1,3 +1,4 @@
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -10,9 +11,19 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-load_dotenv()
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+
+logger = logging.getLogger(__name__)
 
 from .database import ensure_env_file, get_db, init_db
+
+ensure_env_file()
+
+load_dotenv()
+
 from .models import AppSettings
 from .routers import admins_router, employees_router, faces_router, settings_router
 
@@ -22,15 +33,20 @@ limiter = Limiter(key_func=get_remote_address)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    ensure_env_file()
+    logger.info("Initializing database...")
     init_db()
+    logger.info("Database initialized successfully")
+
     db = next(get_db())
     if db.query(AppSettings).first() is None:
+        logger.info("Creating default application settings...")
         db.add(AppSettings())
         db.commit()
-    print("Face Recognition API starting up...")
+        logger.info("Default settings created")
+
+    logger.info("Face Recognition API starting up...")
     yield
-    print("Face Recognition API shutting down...")
+    logger.info("Face Recognition API shutting down...")
 
 
 app = FastAPI(

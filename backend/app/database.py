@@ -1,3 +1,4 @@
+import logging
 import os
 import secrets
 from collections.abc import Generator
@@ -8,13 +9,21 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from .models import Base
 
+logger = logging.getLogger(__name__)
+
 ENV_FILE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
 
 
 def ensure_env_file() -> None:
     if not os.path.exists(ENV_FILE_PATH):
+        logger.info("Checking for .env file...")
+        logger.info(".env file not found, creating new one...")
+
         secret_key = secrets.token_urlsafe(32)
         invite_code = secrets.token_urlsafe(16)[:16]
+
+        logger.info("Generated SECRET_KEY")
+        logger.info("Generated INITIAL_INVITE_CODE: %s", invite_code)
 
         example_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), ".env.example"
@@ -43,9 +52,9 @@ def ensure_env_file() -> None:
                 f.write("MODEL_DIR=models\n")
                 f.write(f"INITIAL_INVITE_CODE={invite_code}\n")
 
-        print(
-            f"Created .env file with generated SECRET_KEY and INITIAL_INVITE_CODE at {ENV_FILE_PATH}"
-        )
+        logger.info("Created .env file at %s", ENV_FILE_PATH)
+    else:
+        logger.info(".env file already exists, skipping creation")
 
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/faces.db")
