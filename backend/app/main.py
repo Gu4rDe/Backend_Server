@@ -44,6 +44,17 @@ async def lifespan(app: FastAPI):
         db.commit()
         logger.info("Default settings created")
 
+    initial_code = os.getenv("INITIAL_INVITE_CODE", "").strip()
+    reset_code = os.getenv("RESET_INVITE_CODE", "").strip()
+    if initial_code:
+        logger.info(f"Initial invite code: {initial_code}")
+    else:
+        logger.warning("INITIAL_INVITE_CODE not set — registration is closed")
+    if reset_code:
+        logger.info(f"Reset invite code: {reset_code}")
+    else:
+        logger.warning("RESET_INVITE_CODE not set — password reset is disabled")
+
     from .routers.faces import face_service
 
     logger.info(f"Face recognition: {face_service.model_status}")

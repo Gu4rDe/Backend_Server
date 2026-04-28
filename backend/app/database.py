@@ -21,9 +21,11 @@ def ensure_env_file() -> None:
 
         secret_key = secrets.token_urlsafe(32)
         invite_code = secrets.token_urlsafe(16)[:16]
+        reset_code = secrets.token_urlsafe(16)[:16]
 
         logger.info("Generated SECRET_KEY")
         logger.info("Generated INITIAL_INVITE_CODE: %s", invite_code)
+        logger.info("Generated RESET_INVITE_CODE: %s", reset_code)
 
         example_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), ".env.example"
@@ -43,6 +45,11 @@ def ensure_env_file() -> None:
                 f"INITIAL_INVITE_CODE={invite_code}",
             )
 
+            content = content.replace(
+                "RESET_INVITE_CODE=",
+                f"RESET_INVITE_CODE={reset_code}",
+            )
+
             with open(ENV_FILE_PATH, "w") as f:
                 f.write(content)
         else:
@@ -51,6 +58,7 @@ def ensure_env_file() -> None:
                 f.write("DATABASE_URL=sqlite:///./data/faces.db\n")
                 f.write("MODEL_DIR=models\n")
                 f.write(f"INITIAL_INVITE_CODE={invite_code}\n")
+                f.write(f"RESET_INVITE_CODE={reset_code}\n")
 
         logger.info("Created .env file at %s", ENV_FILE_PATH)
     else:

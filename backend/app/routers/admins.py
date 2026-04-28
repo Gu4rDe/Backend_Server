@@ -11,13 +11,16 @@ from sqlalchemy.orm import Session
 from ..auth import create_access_token, get_current_admin, hash_password, verify_password
 from ..database import get_db
 from ..models import Admin, AdminInviteCode
+from ..services.invite_service import InviteService
 from ..schemas import (
     AdminLogin,
+    AdminPasswordReset,
     AdminRegister,
     AdminResponse,
     InviteCodeCreate,
     InviteCodeListResponse,
     InviteCodeResponse,
+    MessageResponse,
     TokenResponse,
 )
 
@@ -138,3 +141,38 @@ async def delete_invite_code(
     db.delete(invite_code)
     db.commit()
     return {"message": f"Invite code {code_id} deleted successfully"}
+
+
+@router.post("/admins/reset-password", response_model=MessageResponse)
+@limiter.limit("5/minute")
+async def reset_password(
+    request: Request,
+    reset_data: AdminPasswordReset,
+    db: Annotated[Session, Depends(get_db)],
+):
+    username = reset_data.username.strip()
+
+    admin = db.query(Admin).filter(Admin.username == username).first()
+    if not admin:
+        raise HTTPException(status_code=404, detail="Admin not found")
+
+    invite_code = InviteService.validate_invite_code(db, reset_data.invite_code)
+    is_env_code = False
+
+    if not invite_code:
+        reset_code_env = os.getenv("RESET_INVITE_CODE", "").strip()
+        if reset_code_env and reset_data.invite_code == reset_code_env:
+            is_env_code = True
+
+    if not invite_code and not is_env_code:
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid, expired, or already used invite code",
+        )
+
+    admin.password_hash = hash_password(reset_data.new_password)
+    if invite_code:
+        InviteService.mark_as_used(db, invite_code)
+    db.commit()
+
+    return {"message": "Password reset successfully"}
