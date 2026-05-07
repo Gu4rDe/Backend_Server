@@ -11,7 +11,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 COPY pyproject.toml uv.lock ./
 
-RUN uv sync --frozen --no-dev --no-editable --compile-bytecode
+RUN uv sync --frozen --no-dev --no-editable --compile-bytecode --relocatable
 
 # Runtime stage
 FROM python:3.10-slim
@@ -24,6 +24,9 @@ RUN apt-get update && \
 WORKDIR /app
 
 COPY --from=builder /build/.venv /app/.venv
+RUN find /app/.venv/bin -type f \
+    | xargs grep -l "#!/build/.venv/bin/python" 2>/dev/null \
+    | xargs sed -i 's|#!/build/.venv/bin/python|#!/app/.venv/bin/python|g' || true
 COPY --chown=appuser:appuser . .
 
 RUN mkdir -p data models && chown -R appuser:appuser /app
