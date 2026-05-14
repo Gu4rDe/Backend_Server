@@ -316,6 +316,17 @@ class FaceRecognitionService:
 
         return self._get_embedding_onnx(face_resized)
 
+    @staticmethod
+    def average_embeddings(embeddings: list[np.ndarray]) -> np.ndarray:
+        if not embeddings:
+            raise ValueError("No embeddings provided for averaging")
+        stacked = np.stack(embeddings, axis=0)
+        mean = np.mean(stacked, axis=0)
+        norm = np.linalg.norm(mean)
+        if norm > 0:
+            mean = mean / norm
+        return mean.astype(np.float32)
+
     def compare_faces(
         self, emb1: np.ndarray, emb2: np.ndarray, threshold: float = 0.4
     ) -> bool:
