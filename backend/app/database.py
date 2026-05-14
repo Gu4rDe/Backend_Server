@@ -41,13 +41,13 @@ def ensure_env_file() -> None:
             )
 
             content = content.replace(
-                "INITIAL_INVITE_CODE=",
-                f"INITIAL_INVITE_CODE={invite_code}",
+                "INITIAL_INVITE_CODE=\n",
+                f"INITIAL_INVITE_CODE={invite_code}\n",
             )
 
             content = content.replace(
-                "RESET_INVITE_CODE=",
-                f"RESET_INVITE_CODE={reset_code}",
+                "RESET_INVITE_CODE=\n",
+                f"RESET_INVITE_CODE={reset_code}\n",
             )
 
             with open(ENV_FILE_PATH, "w") as f:
@@ -56,7 +56,6 @@ def ensure_env_file() -> None:
             with open(ENV_FILE_PATH, "w") as f:
                 f.write(f"SECRET_KEY={secret_key}\n")
                 f.write("DATABASE_URL=sqlite:///./data/faces.db\n")
-                f.write("MODEL_DIR=models\n")
                 f.write(f"INITIAL_INVITE_CODE={invite_code}\n")
                 f.write(f"RESET_INVITE_CODE={reset_code}\n")
 

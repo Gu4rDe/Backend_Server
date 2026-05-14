@@ -1,4 +1,3 @@
-import os
 from typing import Annotated
 
 import cv2
@@ -8,13 +7,14 @@ from sqlalchemy.orm import Session
 
 from ..auth import get_current_admin
 from ..database import get_db
-from ..models import Admin, Employee
+from ..deps import get_face_service
+from ..models import Admin, AppSettings, Employee
+from ..services.embedding import deserialize_embedding
 from ..services.face_service import FaceRecognitionService
 
 router = APIRouter(prefix="/api/v1", tags=["faces"])
 
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
-face_service = FaceRecognitionService(model_dir=os.getenv("MODEL_DIR", "models"))
 
 
 def decode_image(contents: bytes) -> np.ndarray:
@@ -30,6 +30,7 @@ async def recognize_file(
     file: Annotated[UploadFile, File(...)],
     db: Annotated[Session, Depends(get_db)],
     current_admin: Annotated[Admin, Depends(get_current_admin)],
+    face_service: FaceRecognitionService = Depends(get_face_service),
 ):
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
@@ -47,39 +48,45 @@ async def recognize_file(
         raise
 
     try:
-        faces = face_service.detect_faces(img)
+        face_results = face_service.detect_and_embed(img)
 
-        if len(faces) == 0:
+        if len(face_results) == 0:
             return {
                 "faces_detected": 0,
                 "results": [],
                 "message": "No faces detected in the image",
             }
 
-        known_faces = db.query(Employee).all()
+        known_faces = db.query(Employee).filter(Employee.embedding.isnot(None)).all()
+
+        if not known_faces:
+            return {
+                "faces_detected": len(face_results),
+                "results": [
+                    {"bbox": fr.bbox, "matches": []}
+                    for fr in face_results
+                ],
+                "message": f"Processed {len(face_results)} face(s), no registered employees",
+            }
 
         known_embeddings = np.array(
-            [
-                np.frombuffer(record.embedding, dtype=np.float64)
-                for record in known_faces
-            ]
+            [deserialize_embedding(record.embedding) for record in known_faces]
         )
         known_records = known_faces
 
+        settings = db.query(AppSettings).first()
+        threshold = settings.match_threshold if settings else 0.4
+
         results = []
 
-        for x, y, w, h in faces:
-            face_img = img[y : y + h, x : x + w]
-            embedding = face_service.get_face_embedding(face_img)
-
-            if embedding is None:
-                continue
-
-            similarities = face_service.compare_faces_batch(embedding, known_embeddings)
+        for fr in face_results:
+            similarities = face_service.compare_faces_batch(
+                fr.embedding, known_embeddings, threshold
+            )
 
             matches = []
             for i, similarity in enumerate(similarities):
-                if similarity > 0.4:
+                if similarity > threshold:
                     record = known_records[i]
                     matches.append(
                         {
@@ -98,12 +105,12 @@ async def recognize_file(
                     )
 
             matches.sort(key=lambda m: m["similarity"], reverse=True)
-            results.append({"bbox": [x, y, w, h], "matches": matches})
+            results.append({"bbox": fr.bbox, "matches": matches})
 
         return {
-            "faces_detected": len(faces),
+            "faces_detected": len(face_results),
             "results": results,
-            "message": f"Processed {len(faces)} face(s)",
+            "message": f"Processed {len(face_results)} face(s)",
         }
 
     except HTTPException:

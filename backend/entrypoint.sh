@@ -6,35 +6,50 @@ echo "  Face Recognition API - Docker Startup"
 echo "========================================="
 echo ""
 
-# Check ArcFace model
-MODEL_PATH="models/arcface.onnx"
-MODEL_URL="https://huggingface.co/garavv/arcface-onnx/resolve/main/arc.onnx?download=true"
+# Pre-download insightface models (buffalo_l)
+INSIGHTFACE_DIR="${HOME}/.insightface/models/buffalo_l"
 
-if [ ! -f "$MODEL_PATH" ]; then
-    echo "[INFO] ArcFace model not found. Downloading..."
-    echo "[INFO] This may take a few minutes (size: ~130 MB)..."
-    mkdir -p models
-    if curl -L -o "$MODEL_PATH" "$MODEL_URL"; then
-        echo "[INFO] Model downloaded successfully"
-    else
-        echo "[ERROR] Failed to download ArcFace model"
-        exit 1
-    fi
+if [ ! -d "$INSIGHTFACE_DIR" ]; then
+    echo "[INFO] insightface models not found. Pre-downloading buffalo_l..."
+    echo "[INFO] This may take a few minutes (size: ~32 MB)..."
+    .venv/bin/python -c "from insightface.app import FaceAnalysis; app = FaceAnalysis(name='buffalo_l'); app.prepare(ctx_id=-1, det_size=(640,640))" || {
+        echo "[WARN] Failed to pre-download insightface models. They will be downloaded on first request."
+    }
 else
-    echo "[INFO] ArcFace model found at $MODEL_PATH"
+    echo "[INFO] insightface models found at $INSIGHTFACE_DIR"
+fi
+
+# Check AdaFace model
+ADAFACE_PATH="models/adaface_ir101.onnx"
+if [ -f "$ADAFACE_PATH" ]; then
+    echo "[INFO] AdaFace model found at $ADAFACE_PATH"
+else
+    echo "[WARN] AdaFace model not found at $ADAFACE_PATH"
+    echo "[WARN] Face recognition will use insightface default (ArcFace R50) as fallback"
+    echo "[WARN] To use AdaFace IR-101, run: python scripts/convert_adaface_to_onnx.py"
 fi
 
 echo ""
 
 # Check .env file
 if [ ! -f ".env" ]; then
-    echo "[INFO] .env file not found. Creating from .env.example..."
-    if [ -f ".env.example" ]; then
-        cp .env.example .env
-        echo "[INFO] .env file created. Please configure SECRET_KEY and INITIAL_INVITE_CODE"
-    else
-        echo "[WARN] No .env.example found. Using defaults."
-    fi
+    echo "[INFO] .env file not found. Creating with generated secrets..."
+    SECRET_KEY=$(.venv/bin/python -c "import secrets; print(secrets.token_urlsafe(32))")
+    ENCRYPTION_KEY=$(.venv/bin/python -c "from app.services.crypto import generate_encryption_key; print(generate_encryption_key())")
+    INITIAL_CODE=$(.venv/bin/python -c "import secrets; print(secrets.token_urlsafe(16))")
+    RESET_CODE=$(.venv/bin/python -c "import secrets; print(secrets.token_urlsafe(16))")
+
+    cat > .env << EOF
+DATABASE_URL=sqlite:///./data/faces.db
+SECRET_KEY=${SECRET_KEY}
+ENCRYPTION_KEY=${ENCRYPTION_KEY}
+INITIAL_INVITE_CODE=${INITIAL_CODE}
+RESET_INVITE_CODE=${RESET_CODE}
+EOF
+
+    echo "[INFO] .env file created with generated secrets"
+    echo "[INFO] INITIAL_INVITE_CODE: ${INITIAL_CODE}"
+    echo "[INFO] RESET_INVITE_CODE: ${RESET_CODE}"
 else
     echo "[INFO] .env file found"
 fi

@@ -61,6 +61,7 @@ sudo apt install -y \
     python3.10-venv \
     python3-pip \
     build-essential \
+    g++ \
     libgl1-mesa-glx \
     libglib2.0-0 \
     libsm6 \
@@ -104,9 +105,11 @@ sudo -u faceapi /opt/faceapi/backend/.venv/bin/pip install --upgrade pip
 sudo -u faceapi /opt/faceapi/backend/.venv/bin/pip install \
     bcrypt==4.0.1 \
     "fastapi>=0.110.0" \
-    mediapipe==0.10.9 \
+    "insightface>=0.7.3" \
     numpy==1.26.4 \
-    opencv-python==4.10.0.84 \
+    "onnx>=1.16.0,<1.17" \
+    "onnxruntime>=1.16.0,<1.24" \
+    opencv-python-headless \
     "passlib[bcrypt]==1.7.4" \
     "pydantic>=2.0,<3.0" \
     python-dotenv==1.0.0 \
@@ -124,7 +127,6 @@ sudo -u faceapi nano /opt/faceapi/backend/.env
 
 ```env
 DATABASE_URL=sqlite:///./data/faces.db
-MODEL_DIR=models
 SECRET_KEY=сгенерируйте_случайную_строку_минимум_32_символа
 CORS_ORIGINS=https://your-domain.com
 ```
@@ -135,18 +137,21 @@ CORS_ORIGINS=https://your-domain.com
 
 ```bash
 sudo -u faceapi mkdir -p /opt/faceapi/backend/data
-sudo -u faceapi mkdir -p /opt/faceapi/backend/models
 ```
 
-### Загрузка модели распознавания лиц
+### Загрузка моделей распознавания лиц
 
-Для работы распознавания лиц скачайте ArcFace ONNX модель:
+Модели insightface (buffalo_l) скачиваются автоматически при первом запуске (~32 MB).
 
+Для ручной предзагрузки:
 ```bash
-cd /opt/faceapi/backend/models
+sudo -u faceapi /opt/faceapi/backend/.venv/bin/python -c "from insightface.app import FaceAnalysis; app = FaceAnalysis(name='buffalo_l'); app.prepare(ctx_id=-1)"
+```
 
-# Скачайте ArcFace модель
-sudo -u faceapi curl -L -o arcface.onnx "https://huggingface.co/garavv/arcface-onnx/resolve/main/arc.onnx?download=true"
+Для использования AdaFace IR-101 (опционально):
+```bash
+cd /opt/faceapi/backend
+sudo -u faceapi .venv/bin/python scripts/convert_adaface_to_onnx.py
 ```
 
 Подробнее о моделях см. [MODELS.md](MODELS.md).
@@ -437,7 +442,7 @@ curl https://your-domain.com/health
 
 Ожидаемый ответ:
 ```json
-{"status":"healthy","service":"face-recognition-api","version":"3.0.0"}
+{"status":"healthy","service":"face-recognition-api","version":"5.0.0"}
 ```
 
 ### Проверка основного эндпоинта
@@ -521,7 +526,6 @@ sudo -u faceapi nano /opt/faceapi/backend/.env
 
 # Стало (PostgreSQL):
 DATABASE_URL=postgresql://faceapi:ваш_надёжный_пароль@localhost:5432/faceapi_db
-MODEL_DIR=models
 SECRET_KEY=ваш_секретный_ключ
 CORS_ORIGINS=https://your-domain.com
 ```
