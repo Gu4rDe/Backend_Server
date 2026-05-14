@@ -1,4 +1,3 @@
-import os
 from typing import Annotated
 
 import cv2
@@ -8,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import get_current_admin
 from ..database import get_db
+from ..deps import get_face_service
 from ..models import Admin, Employee
 from ..schemas import (
     EmployeeCreate,
@@ -15,12 +15,12 @@ from ..schemas import (
     EmployeeStats,
     EmployeeUpdate,
 )
+from ..services.embedding import serialize_embedding
 from ..services.face_service import FaceRecognitionService
 
 router = APIRouter(prefix="/api/v1", tags=["employees"])
 
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
-face_service = FaceRecognitionService(model_dir=os.getenv("MODEL_DIR", "models"))
 
 
 def decode_image(contents: bytes) -> np.ndarray:
@@ -54,6 +54,7 @@ async def register_employee(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
+    face_service: FaceRecognitionService = Depends(get_face_service),
 ):
     # Sanitize inputs
     username = sanitize_string(username, 150)
@@ -91,26 +92,18 @@ async def register_employee(
         raise
 
     try:
-        faces = face_service.detect_faces(img)
+        face_results = face_service.detect_and_embed(img)
 
-        if len(faces) == 0:
+        if len(face_results) == 0:
             raise HTTPException(status_code=400, detail="No face detected in the image")
 
-        if len(faces) > 1:
+        if len(face_results) > 1:
             raise HTTPException(
                 status_code=400,
                 detail="Multiple faces detected. Please provide an image with a single face.",
             )
 
-        x, y, w, h = faces[0]
-        face_img = img[y : y + h, x : x + w]
-
-        embedding = face_service.get_face_embedding(face_img)
-
-        if embedding is None:
-            raise HTTPException(
-                status_code=500, detail="Failed to extract face embedding"
-            )
+        face = face_results[0]
 
         employee = Employee(
             employee_id=employee_id,
@@ -123,7 +116,7 @@ async def register_employee(
             hire_date=hire_date,
             is_active=is_active,
             access_enabled=access_enabled,
-            embedding=embedding.tobytes(),
+            embedding=serialize_embedding(face.embedding),
         )
 
         db.add(employee)
