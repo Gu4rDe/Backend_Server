@@ -4,9 +4,9 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com/)
 [![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0.23-red.svg)](https://www.sqlalchemy.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-4.1.0-orange.svg)]()
+[![Version](https://img.shields.io/badge/version-5.0.0-orange.svg)]()
 
-REST API server for the **Miit_FaceDetect** face recognition system. Built with **FastAPI** and **SQLAlchemy**, providing admin authentication, employee management, face recognition via ArcFace ONNX, and application settings.
+REST API server for the **Miit_FaceDetect** face recognition system. Built with **FastAPI** and **SQLAlchemy**, providing admin authentication, employee management, face recognition via insightface + AdaFace IR-101, and application settings.
 
 ## Table of Contents
 
@@ -19,18 +19,21 @@ REST API server for the **Miit_FaceDetect** face recognition system. Built with 
 - [Usage](#usage)
 - [Configuration](#configuration)
 - [API Reference](#api-reference)
+- [Testing](#testing)
 - [Contributing](#contributing)
 - [License](#license)
 
 ## Features
 
-- **Admin Authentication** — login, registration with invite codes, password reset via invite code, JWT Bearer token management
-- **Employee Management** — CRUD operations, pagination, employee statistics
-- **Face Recognition** — ArcFace ONNX model (512-dim embeddings), histogram fallback mode, image upload for recognition and registration
-- **Application Settings** — runtime configuration of camera, notifications, match threshold, connection parameters
+- **Admin Authentication** — login, registration with invite codes, password reset, JWT Bearer tokens
+- **Employee Management** — CRUD operations, pagination, search, statistics
+- **Face Recognition** — insightface SCRFD detector + AdaFace IR-101 (512-dim float32 embeddings), CLAHE preprocessing, 5-point face alignment
+- **Face Detection** — SCRFD-10GF with confidence threshold, automatic landmark detection
+- **Application Settings** — runtime configuration of match threshold, camera, notifications
 - **Rate Limiting** — endpoint protection via slowapi
 - **Auto-initialization** — `.env`, database, and default settings created on first launch
-- **Docker** — multi-stage build, healthcheck, automatic ArcFace model download
+- **Docker** — multi-stage build, healthcheck, insightface model auto-download
+- **Tests** — pytest infrastructure with in-memory SQLite
 
 ## Tech Stack
 
@@ -45,36 +48,38 @@ REST API server for the **Miit_FaceDetect** face recognition system. Built with 
 | Database (prod) | PostgreSQL | — |
 | Authentication | python-jose + bcrypt | 3.3.0 / 4.0.1 |
 | Validation | Pydantic | >=2.0 |
-| Face Detection | MediaPipe | 0.10.9 |
-| Face Recognition | ArcFace ONNX + onnxruntime | >=1.16.0 |
-| Image Processing | OpenCV | 4.10.0.84 |
+| Face Detection | insightface SCRFD-10GF | >=0.7.3 |
+| Face Recognition | AdaFace IR-101 / ArcFace R50 | ONNX |
+| Preprocessing | CLAHE (OpenCV) | headless |
+| Inference | onnxruntime | >=1.16.0 |
 | Rate Limiting | slowapi | 0.1.9 |
 | Server | Uvicorn | 0.24.0 |
 | Containerization | Docker | python:3.10-slim |
 
 ## Architecture
 
-Layered architecture with strict dependency flow:
-
 ```
 Client ──▶ Routers ──▶ Services ──▶ Database
-                                    │
-                             ┌──────▼──────┐
-                             │ ArcFace ONNX│
-                             └─────────────┘
+                            │
+                    ┌───────▼───────┐
+                    │  insightface   │
+                    │  (SCRFD +      │
+                    │  AdaFace/ArcR50)│
+                    └───────────────┘
 ```
 
 | Layer | Responsibility |
 |-------|----------------|
 | **Routers** | HTTP endpoints, request validation (Pydantic), response serialization |
-| **Services** | Business logic, face recognition, invite code management |
+| **Services** | Business logic, face recognition pipeline, embedding serialization |
 | **Database** | SQLAlchemy models, session management, data persistence |
 | **Auth** | JWT token generation/verification, bcrypt password hashing |
 
-**Cross-cutting:**
-- **Dependency Injection** — FastAPI `Depends()` for authentication and DB sessions
-- **Rate Limiting** — slowapi decorator on sensitive endpoints
-- **Lifespan** — auto-initialization of `.env`, database, and settings on startup
+**Key design decisions:**
+- **Singleton service** — one `FaceRecognitionService` instance shared across the app via `app.state`
+- **CLAHE preprocessing** — applied to full image before detection for low-light enhancement
+- **float32 embeddings** — 2048 bytes each, with safe deserialization helper for legacy float64
+- **Dynamic threshold** — match threshold from `AppSettings` instead of hardcoded value
 
 ## Project Structure
 
@@ -86,24 +91,34 @@ backend/
 │   ├── models.py            # SQLAlchemy models (Admin, Employee, AppSettings)
 │   ├── schemas.py           # Pydantic request/response schemas
 │   ├── auth.py              # JWT authentication utilities
-│   ├── deps.py              # FastAPI dependencies (get_current_admin)
+│   ├── deps.py              # FastAPI dependencies (get_current_admin, get_face_service)
 │   ├── routers/
 │   │   ├── admins.py        # Admin registration, login, password reset
-│   │   ├── employees.py     # Employee CRUD operations
-│   │   ├── faces.py         # Face recognition & registration
+│   │   ├── employees.py     # Employee CRUD + face registration
+│   │   ├── faces.py         # Face recognition endpoint
 │   │   └── settings.py      # Application settings management
 │   └── services/
-│       ├── face_service.py  # Face recognition business logic
+│       ├── face_service.py  # Face recognition pipeline (insightface + AdaFace)
+│       ├── embedding.py     # Embedding serialization/deserialization (float32)
 │       └── invite_service.py # Invite code system
 ├── alembic/                 # Database migration scripts
-├── models/                  # ML models (arcface.onnx)
-├── data/                    # SQLite database files
+├── data/                    # SQLite database files (gitignored)
+├── models/                  # ONNX models (gitignored, adaface_ir101.onnx)
+├── scripts/                 # Utility scripts (AdaFace ONNX conversion)
+├── tests/                   # pytest test suite
+│   ├── conftest.py          # Test client, in-memory DB, fixtures
+│   ├── test_admins.py       # Admin endpoint tests
+│   ├── test_health.py       # Health endpoint tests
+│   ├── test_clahe.py        # CLAHE preprocessing tests
+│   ├── test_embedding.py    # Embedding serialization tests
+│   └── test_singleton.py    # Service singleton test
 ├── Dockerfile               # Multi-stage Docker build
 ├── docker-compose.yml       # Docker Compose configuration
-├── entrypoint.sh            # Docker entrypoint script
+├── entrypoint.sh            # Docker entrypoint (insightface model download)
 ├── pyproject.toml           # Project dependencies
 ├── .env.example             # Environment variables template
-└── MODELS.md                # Face recognition model documentation
+├── MODELS.md                # Face recognition model documentation
+└── BACKEND_SETUP.md         # Deployment guide (Russian)
 ```
 
 ## Prerequisites
@@ -112,8 +127,8 @@ backend/
 |-------------|---------|-------|
 | Python | 3.10+ | Required for runtime |
 | uv | — | Package manager (`pip install uv`) |
+| C++ compiler | — | Required for insightface Cython extension (MSVC on Windows, gcc/g++ on Linux) |
 | Docker | — | Optional, for containerized deployment |
-| ArcFace ONNX | ~130 MB | Auto-downloaded in Docker; manual for local dev |
 
 ## Installation
 
@@ -128,17 +143,20 @@ cd <repo-name>/backend
 
 ```bash
 uv sync
+uv sync --group dev   # for testing
 ```
 
-3. **Download ArcFace model** (for local development)
+3. **Download insightface models** (for local development)
+
+The `buffalo_l` model pack downloads automatically on first run (~32 MB). For Docker, it's handled by `entrypoint.sh`.
+
+4. **(Optional) Download AdaFace IR-101 model**
 
 ```bash
-# Windows
-Invoke-WebRequest -Uri "https://huggingface.co/garavv/arcface-onnx/resolve/main/arc.onnx?download=true" -OutFile "models/arcface.onnx"
-
-# Linux/macOS
-curl -L -o models/arcface.onnx "https://huggingface.co/garavv/arcface-onnx/resolve/main/arc.onnx?download=true"
+python scripts/convert_adaface_to_onnx.py
 ```
+
+If not provided, the system falls back to insightface's built-in ArcFace R50.
 
 ## Usage
 
@@ -148,7 +166,7 @@ curl -L -o models/arcface.onnx "https://huggingface.co/garavv/arcface-onnx/resol
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
-The server starts at `http://localhost:8000`. API documentation is available at:
+The server starts at `http://localhost:8000`. API documentation:
 - **Swagger UI:** http://localhost:8000/docs
 - **ReDoc:** http://localhost:8000/redoc
 
@@ -157,7 +175,8 @@ The server starts at `http://localhost:8000`. API documentation is available at:
 On first startup, the system automatically:
 1. Creates `.env` with generated `SECRET_KEY` and `INITIAL_INVITE_CODE`
 2. Initializes the SQLite database
-3. Creates default application settings
+3. Downloads insightface `buffalo_l` models on first face recognition request
+4. Creates default application settings
 
 > **Important:** Copy the `INITIAL_INVITE_CODE` from the logs — it's required to register the first admin!
 
@@ -165,18 +184,19 @@ On first startup, the system automatically:
 
 ```bash
 cd backend
+docker compose build
 docker compose up -d
 ```
 
-The ArcFace model is downloaded automatically on first container startup.
+Insightface models are downloaded automatically on first container startup.
 
-### Build Docker image
+### Run tests
 
 ```bash
-docker build -t face-recognition-api ./backend
+uv run pytest tests/ -v
 ```
 
-### Run database migrations
+### Database migrations
 
 ```bash
 # Apply migrations
@@ -197,19 +217,29 @@ uv run alembic downgrade -1
 |----------|-------------|---------|
 | `SECRET_KEY` | JWT secret key | auto-generated |
 | `DATABASE_URL` | Database connection URL | `sqlite:///./data/faces.db` |
-| `MODEL_DIR` | Face recognition models directory | `models` |
 | `INITIAL_INVITE_CODE` | First admin registration code | auto-generated |
 | `RESET_INVITE_CODE` | Admin password reset code | — |
 | `CORS_ORIGINS` | Allowed CORS origins | `*` |
 
-### Face Recognition Model
+### Face Recognition Pipeline
 
-| Mode | Model | Input | Output | Accuracy |
-|------|-------|-------|--------|----------|
-| Primary | ArcFace ONNX (ResNet-100) | 112x112 RGB | 512-dim embedding | High |
-| Fallback | Histogram | 96x96 grayscale | 64-bin → 512-dim | Low (testing only) |
+| Step | Component | Details |
+|------|-----------|---------|
+| 1. Preprocessing | CLAHE | BGR→LAB, clipLimit=2.0, tileGridSize=(8,8) |
+| 2. Detection | SCRFD-10GF | 5-point landmarks, confidence threshold |
+| 3. Alignment | norm_crop | 5-point similarity transform → 112×112 |
+| 4. Recognition | AdaFace IR-101 / ArcFace R50 | 512-dim float32 embedding |
+| 5. Comparison | Cosine similarity | Matrix-vector multiply, threshold from settings |
 
-The fallback mode activates automatically if `arcface.onnx` is not found.
+### Embedding Format
+
+| Property | Value |
+|----------|-------|
+| Dimension | 512 |
+| Data type | float32 |
+| Size | 2048 bytes per embedding |
+| Storage | SQLite LargeBinary |
+| Legacy support | Auto-detects and converts float64 (4096 bytes) |
 
 ## API Reference
 
@@ -219,42 +249,57 @@ The fallback mode activates automatically if `arcface.onnx` is not found.
 
 | Method | Endpoint | Auth | Body | Response |
 |--------|----------|------|------|----------|
-| POST | `/admins/register` | — | `{username, email, password, invite_code}` | `{id, username, email, created_at}` |
-| POST | `/admins/login` | — | `{username, password}` | `{access_token, token_type}` |
-| GET | `/admins/me` | Yes | — | `{id, username, email, created_at}` |
-| POST | `/admins/reset-password` | — | `{username, invite_code, new_password}` | `200 OK` |
+| POST | `/api/v1/admins/register` | — | `{username, email, password, invite_code}` | `{id, username, email, created_at}` |
+| POST | `/api/v1/admins/login` | — | `{username, password}` | `{access_token, token_type}` |
+| GET | `/api/v1/admins/me` | Yes | — | `{id, username, email, created_at}` |
+| POST | `/api/v1/admins/reset-password` | — | `{username, invite_code, new_password}` | `200 OK` |
+| POST | `/api/v1/admin/invites` | Yes | `{expires_hours}` | `{id, code, created_by, ...}` |
+| GET | `/api/v1/admin/invites` | Yes | — | `[{InviteCodeResponse}]` |
+| DELETE | `/api/v1/admin/invites/{id}` | Yes | — | `200 OK` |
 
 ### Employees
 
 | Method | Endpoint | Auth | Body | Response |
 |--------|----------|------|------|----------|
-| POST | `/employees/` | Yes | `{employee_id, username, email, department, ...}` | `{EmployeeResponse}` |
-| GET | `/employees/` | Yes | Query: `skip`, `limit` | `[{EmployeeResponse}]` |
-| GET | `/employees/{id}` | Yes | — | `{EmployeeResponse}` |
-| PUT | `/employees/{id}` | Yes | `{EmployeeUpdate}` | `{EmployeeResponse}` |
-| DELETE | `/employees/{id}` | Yes | — | `204` |
-| GET | `/employees/stats` | Yes | — | `{total, active, inactive}` |
+| POST | `/api/v1/employees/register` | Yes | Multipart (image + form) | `{EmployeeResponse}` |
+| GET | `/api/v1/employees` | Yes | Query: `skip`, `limit` | `[{EmployeeResponse}]` |
+| GET | `/api/v1/employees/search` | Yes | Query: `q` | `[{EmployeeResponse}]` |
+| GET | `/api/v1/employees/stats` | Yes | — | `{total, active, inactive}` |
+| PUT | `/api/v1/employees/{id}` | Yes | `{EmployeeUpdate}` | `{EmployeeResponse}` |
+| DELETE | `/api/v1/employees/{id}` | Yes | — | `200 OK` |
 
 ### Face Recognition
 
 | Method | Endpoint | Auth | Body | Response |
 |--------|----------|------|------|----------|
-| POST | `/faces/recognize` | Yes | Multipart (image) | `{faces_detected, results}` |
-| POST | `/faces/register` | Yes | Multipart (image, employee_id) | `200 OK` |
+| POST | `/api/v1/faces/recognize` | Yes | Multipart (image) | `{faces_detected, results}` |
 
 ### Settings
 
 | Method | Endpoint | Auth | Body | Response |
 |--------|----------|------|------|----------|
-| GET | `/settings/` | Yes | — | `{AppSettings}` |
-| PUT | `/settings/` | Yes | `{AppSettingsUpdate}` | `{AppSettings}` |
+| GET | `/api/v1/settings` | Yes | — | `{AppSettings}` |
+| PUT | `/api/v1/settings` | Yes | `{AppSettingsUpdate}` | `{AppSettings}` |
+| POST | `/api/v1/settings/backup` | Yes | — | File download |
 
 ### Health Check
 
 | Method | Endpoint | Auth | Response |
 |--------|----------|------|----------|
 | GET | `/health` | — | `{status: "healthy", service, version}` |
-| GET | `/` | — | `{message, version, docs}` |
+| GET | `/` | — | `{message}` |
+
+## Changelog — v5.0.0
+
+- **insightface + AdaFace IR-101** replaces MediaPipe + ArcFace
+- **CLAHE preprocessing** for low-light face detection
+- **float32 embeddings** instead of float64 (half the storage)
+- **Dynamic match threshold** from AppSettings instead of hardcoded 0.4
+- **Singleton FaceRecognitionService** via app.state instead of two module-level instances
+- **Unified `detect_and_embed()` API** instead of separate `detect_faces()` + `get_face_embedding()`
+- **Safe embedding deserialization** with auto-detection of float64 legacy data
+- **pytest test suite** with 20+ tests
+- **Removed**: MediaPipe, ArcFace ONNX, histogram fallback, `MODEL_DIR` env var
 
 ## Contributing
 
