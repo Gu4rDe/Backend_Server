@@ -64,7 +64,7 @@ class Employee(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     access_enabled = Column(Boolean, default=True, nullable=False)
     photo_path = Column(String(255), default="")
-    embedding = Column(LargeBinary, nullable=False)
+    embedding = Column(LargeBinary, nullable=True)
     created_at = Column(DateTime, default=func.now(), nullable=False)
 
     def __repr__(self) -> str:
