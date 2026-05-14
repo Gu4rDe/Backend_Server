@@ -9,10 +9,10 @@ services:
       - "8000:8000"
     volumes:
       - face-data:/app/data
-      - face-models:/app/models
+      - adaface-models:/app/models
+      - insightface-cache:/home/appuser/.insightface
     environment:
       - DATABASE_URL=sqlite:///./data/faces.db
-      - MODEL_DIR=models
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -27,4 +27,5 @@ services:
 
 volumes:
   face-data:
-  face-models:
+  adaface-models:
+  insightface-cache:

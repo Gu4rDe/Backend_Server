@@ -4,14 +4,14 @@ FROM python:3.10-slim AS builder
 WORKDIR /build
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc && \
+    apt-get install -y --no-install-recommends gcc g++ && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 COPY pyproject.toml uv.lock ./
 
-RUN uv sync --frozen --no-dev --no-editable --compile-bytecode --relocatable
+RUN uv sync --frozen --no-dev --no-editable --compile-bytecode
 
 # Runtime stage
 FROM python:3.10-slim
@@ -24,14 +24,16 @@ RUN apt-get update && \
 WORKDIR /app
 
 COPY --from=builder /build/.venv /app/.venv
-RUN find /app/.venv/bin -type f \
-    | xargs grep -l "#!/build/.venv/bin/python" 2>/dev/null \
+RUN find /app/.venv/bin -type f -executable \
+    | xargs grep -l "^#!/build/.venv" 2>/dev/null \
     | xargs sed -i 's|#!/build/.venv/bin/python|#!/app/.venv/bin/python|g' || true
 COPY --chown=appuser:appuser . .
 
 RUN mkdir -p data models && chown -R appuser:appuser /app
 
 USER appuser
+
+RUN mkdir -p /home/appuser/.insightface/models
 
 ENV PATH="/app/.venv/bin:$PATH"
 

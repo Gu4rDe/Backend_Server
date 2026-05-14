@@ -15,3 +15,6 @@ models/*.pb
 models/*.bin
 models/*.caffemodel
 models/*.weights
+.pytest_cache/
+.coverage
+htmlcov/
