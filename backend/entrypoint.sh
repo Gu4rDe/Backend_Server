@@ -35,12 +35,14 @@ echo ""
 if [ ! -f ".env" ]; then
     echo "[INFO] .env file not found. Creating with generated secrets..."
     SECRET_KEY=$(.venv/bin/python -c "import secrets; print(secrets.token_urlsafe(32))")
+    ENCRYPTION_KEY=$(.venv/bin/python -c "from app.services.crypto import generate_encryption_key; print(generate_encryption_key())")
     INITIAL_CODE=$(.venv/bin/python -c "import secrets; print(secrets.token_urlsafe(16))")
     RESET_CODE=$(.venv/bin/python -c "import secrets; print(secrets.token_urlsafe(16))")
 
     cat > .env << EOF
 DATABASE_URL=sqlite:///./data/faces.db
 SECRET_KEY=${SECRET_KEY}
+ENCRYPTION_KEY=${ENCRYPTION_KEY}
 INITIAL_INVITE_CODE=${INITIAL_CODE}
 RESET_INVITE_CODE=${RESET_CODE}
 EOF

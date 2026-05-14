@@ -5,6 +5,7 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["INITIAL_INVITE_CODE"] = "testinvitecode1234"
 os.environ["RESET_INVITE_CODE"] = "testresetcode12345"
 os.environ["MODEL_DIR"] = "models"
+os.environ["ENCRYPTION_KEY"] = "n5RB92P5EAO1cpfUkhhKBGS1LKMt7gmwMobJPU7-pTI="
 
 import pytest
 from fastapi.testclient import TestClient

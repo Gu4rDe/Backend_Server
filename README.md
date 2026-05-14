@@ -27,7 +27,8 @@ REST API server for the **Miit_FaceDetect** face recognition system. Built with 
 
 - **Admin Authentication** — login, registration with invite codes, password reset, JWT Bearer tokens
 - **Employee Management** — CRUD operations, pagination, search, statistics
-- **Face Recognition** — insightface SCRFD detector + AdaFace IR-101 (512-dim float32 embeddings), CLAHE preprocessing, 5-point face alignment
+- **Face Recognition** — insightface SCRFD detector + AdaFace IR-101 (512-dim float32 embeddings), CLAHE preprocessing, 5-point face alignment, multi-photo registration (3-5 photos with embedding averaging)
+- **Embedding Encryption** — AES-256-GCM encryption at rest with backward-compatible deserialization
 - **Face Detection** — SCRFD-10GF with confidence threshold, automatic landmark detection
 - **Application Settings** — runtime configuration of match threshold, camera, notifications
 - **Rate Limiting** — endpoint protection via slowapi
@@ -47,6 +48,7 @@ REST API server for the **Miit_FaceDetect** face recognition system. Built with 
 | Database (dev) | SQLite | — |
 | Database (prod) | PostgreSQL | — |
 | Authentication | python-jose + bcrypt | 3.3.0 / 4.0.1 |
+| Encryption | cryptography | >=42.0.0 |
 | Validation | Pydantic | >=2.0 |
 | Face Detection | insightface SCRFD-10GF | >=0.7.3 |
 | Face Recognition | AdaFace IR-101 / ArcFace R50 | ONNX |
@@ -71,14 +73,14 @@ Client ──▶ Routers ──▶ Services ──▶ Database
 | Layer | Responsibility |
 |-------|----------------|
 | **Routers** | HTTP endpoints, request validation (Pydantic), response serialization |
-| **Services** | Business logic, face recognition pipeline, embedding serialization |
+| **Services** | Business logic, face recognition pipeline, embedding encryption/serialization |
 | **Database** | SQLAlchemy models, session management, data persistence |
 | **Auth** | JWT token generation/verification, bcrypt password hashing |
 
 **Key design decisions:**
 - **Singleton service** — one `FaceRecognitionService` instance shared across the app via `app.state`
 - **CLAHE preprocessing** — applied to full image before detection for low-light enhancement
-- **float32 embeddings** — 2048 bytes each, with safe deserialization helper for legacy float64
+- **float32 embeddings** — 2048 bytes each, encrypted at rest with AES-256-GCM, with safe deserialization helper for legacy float64
 - **Dynamic threshold** — match threshold from `AppSettings` instead of hardcoded value
 
 ## Project Structure
@@ -99,7 +101,8 @@ backend/
 │   │   └── settings.py      # Application settings management
 │   └── services/
 │       ├── face_service.py  # Face recognition pipeline (insightface + AdaFace)
-│       ├── embedding.py     # Embedding serialization/deserialization (float32)
+│       ├── crypto.py        # AES-256-GCM encryption/decryption for embeddings
+│       ├── embedding.py     # Embedding serialization with encryption (float32 → encrypted blob)
 │       └── invite_service.py # Invite code system
 ├── alembic/                 # Database migration scripts
 ├── data/                    # SQLite database files (gitignored)
@@ -110,7 +113,9 @@ backend/
 │   ├── test_admins.py       # Admin endpoint tests
 │   ├── test_health.py       # Health endpoint tests
 │   ├── test_clahe.py        # CLAHE preprocessing tests
-│   ├── test_embedding.py    # Embedding serialization tests
+│   ├── test_embedding.py    # Embedding encryption/serialization tests
+│   ├── test_crypto.py        # AES-256-GCM encryption tests
+│   ├── test_employees.py     # Multi-photo registration tests
 │   └── test_singleton.py    # Service singleton test
 ├── Dockerfile               # Multi-stage Docker build
 ├── docker-compose.yml       # Docker Compose configuration
@@ -173,7 +178,7 @@ The server starts at `http://localhost:8000`. API documentation:
 ### First launch
 
 On first startup, the system automatically:
-1. Creates `.env` with generated `SECRET_KEY` and `INITIAL_INVITE_CODE`
+1. Creates `.env` with generated `SECRET_KEY`, `ENCRYPTION_KEY`, and `INITIAL_INVITE_CODE`
 2. Initializes the SQLite database
 3. Downloads insightface `buffalo_l` models on first face recognition request
 4. Creates default application settings
@@ -216,6 +221,7 @@ uv run alembic downgrade -1
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `SECRET_KEY` | JWT secret key | auto-generated |
+| `ENCRYPTION_KEY` | AES-256-GCM key for embedding encryption (base64) | auto-generated |
 | `DATABASE_URL` | Database connection URL | `sqlite:///./data/faces.db` |
 | `INITIAL_INVITE_CODE` | First admin registration code | auto-generated |
 | `RESET_INVITE_CODE` | Admin password reset code | — |
@@ -231,15 +237,31 @@ uv run alembic downgrade -1
 | 4. Recognition | AdaFace IR-101 / ArcFace R50 | 512-dim float32 embedding |
 | 5. Comparison | Cosine similarity | Matrix-vector multiply, threshold from settings |
 
+### Embedding Encryption
+
+Embeddings are encrypted at rest using **AES-256-GCM** before being stored in the database.
+
+| Property | Value |
+|----------|-------|
+| Algorithm | AES-256-GCM (authenticated encryption) |
+| Key | 256-bit, stored as base64 in `ENCRYPTION_KEY` env var |
+| Nonce | 12 random bytes per encryption (different ciphertext each time) |
+| Format | `[0x01 version][12B nonce][ciphertext + 16B GCM tag]` |
+| Overhead | 29 bytes per embedding (1 + 12 + 16) |
+| Backward compatibility | Legacy unencrypted float32/float64 embeddings auto-detected by absence of `0x01` prefix |
+
+> **Note:** Changing `ENCRYPTION_KEY` makes existing embeddings unreadable. Keep it safe and backed up.
+
 ### Embedding Format
 
 | Property | Value |
 |----------|-------|
 | Dimension | 512 |
 | Data type | float32 |
-| Size | 2048 bytes per embedding |
-| Storage | SQLite LargeBinary |
-| Legacy support | Auto-detects and converts float64 (4096 bytes) |
+| Size (raw) | 2048 bytes per embedding |
+| Size (encrypted) | 2077 bytes per embedding (2048 + 29 overhead) |
+| Storage | SQLite LargeBinary (encrypted) |
+| Legacy support | Auto-detects and converts unencrypted float32/float64 |
 
 ## API Reference
 
@@ -261,7 +283,8 @@ uv run alembic downgrade -1
 
 | Method | Endpoint | Auth | Body | Response |
 |--------|----------|------|------|----------|
-| POST | `/api/v1/employees/register` | Yes | Multipart (image + form) | `{EmployeeResponse}` |
+| POST | `/api/v1/employees/register` | Yes | Multipart (3-5 images + form) | `{EmployeeResponse}` |
+| POST | `/api/v1/employees/{id}/re-embed` | Yes | Multipart (3-5 images) | `{EmployeeResponse}` |
 | GET | `/api/v1/employees` | Yes | Query: `skip`, `limit` | `[{EmployeeResponse}]` |
 | GET | `/api/v1/employees/search` | Yes | Query: `q` | `[{EmployeeResponse}]` |
 | GET | `/api/v1/employees/stats` | Yes | — | `{total, active, inactive}` |
@@ -292,13 +315,15 @@ uv run alembic downgrade -1
 ## Changelog — v5.0.0
 
 - **insightface + AdaFace IR-101** replaces MediaPipe + ArcFace
+- **Multi-photo registration** — 3-5 photos per employee, embeddings averaged (mean + L2-norm)
+- **Re-embed endpoint** — `POST /employees/{id}/re-embed` to update face embeddings
+- **Embedding encryption** — AES-256-GCM at rest, with backward-compatible legacy deserialization
 - **CLAHE preprocessing** for low-light face detection
 - **float32 embeddings** instead of float64 (half the storage)
 - **Dynamic match threshold** from AppSettings instead of hardcoded 0.4
 - **Singleton FaceRecognitionService** via app.state instead of two module-level instances
 - **Unified `detect_and_embed()` API** instead of separate `detect_faces()` + `get_face_embedding()`
-- **Safe embedding deserialization** with auto-detection of float64 legacy data
-- **pytest test suite** with 20+ tests
+- **pytest test suite** with 48 tests
 - **Removed**: MediaPipe, ArcFace ONNX, histogram fallback, `MODEL_DIR` env var
 
 ## Contributing
