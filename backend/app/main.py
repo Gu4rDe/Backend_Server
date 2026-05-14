@@ -26,6 +26,7 @@ load_dotenv()
 
 from .models import AppSettings
 from .routers import admins_router, employees_router, faces_router, settings_router
+from .services.face_service import FaceRecognitionService
 
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -44,6 +45,10 @@ async def lifespan(app: FastAPI):
         db.commit()
         logger.info("Default settings created")
 
+    face_service = FaceRecognitionService(model_dir=os.getenv("MODEL_DIR", "models"))
+    app.state.face_service = face_service
+    logger.info(f"Face recognition: {face_service.model_status}")
+
     initial_code = os.getenv("INITIAL_INVITE_CODE", "").strip()
     reset_code = os.getenv("RESET_INVITE_CODE", "").strip()
     if initial_code:
@@ -55,9 +60,6 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("RESET_INVITE_CODE not set — password reset is disabled")
 
-    from .routers.faces import face_service
-
-    logger.info(f"Face recognition: {face_service.model_status}")
     logger.info("Face Recognition API starting up...")
     yield
     logger.info("Face Recognition API shutting down...")
@@ -66,7 +68,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Face Recognition API",
     description="API for face recognition system with admin authentication",
-    version="4.1.0",
+    version="5.0.0",
     lifespan=lifespan,
 )
 app.state.limiter = limiter
@@ -96,7 +98,7 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "face-recognition-api", "version": "4.1.0"}
+    return {"status": "healthy", "service": "face-recognition-api", "version": "5.0.0"}
 
 
 if __name__ == "__main__":
