@@ -20,7 +20,7 @@ from ..services.face_service import FaceRecognitionService
 
 router = APIRouter(prefix="/api/v1", tags=["employees"])
 
-MIN_PHOTOS = 3
+MIN_PHOTOS = 1
 MAX_PHOTOS = 5
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
 
@@ -108,7 +108,10 @@ async def register_employee(
         embeddings.append(face_results[0].embedding)
 
     try:
-        final_embedding = FaceRecognitionService.average_embeddings(embeddings)
+        if len(embeddings) == 1:
+            final_embedding = embeddings[0]
+        else:
+            final_embedding = FaceRecognitionService.average_embeddings(embeddings)
 
         employee = Employee(
             employee_id=employee_id,
@@ -180,7 +183,10 @@ async def re_embed_employee(
         embeddings.append(face_results[0].embedding)
 
     try:
-        final_embedding = FaceRecognitionService.average_embeddings(embeddings)
+        if len(embeddings) == 1:
+            final_embedding = embeddings[0]
+        else:
+            final_embedding = FaceRecognitionService.average_embeddings(embeddings)
         employee.embedding = serialize_embedding(final_embedding)
         db.commit()
         db.refresh(employee)
