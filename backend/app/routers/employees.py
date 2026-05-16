@@ -17,28 +17,13 @@ from ..schemas import (
 )
 from ..services.embedding import serialize_embedding, deserialize_embedding
 from ..services.face_service import FaceRecognitionService
+from ..utils import decode_image, sanitize_string
 
 router = APIRouter(prefix="/api/v1", tags=["employees"])
 
 MIN_PHOTOS = 1
 MAX_PHOTOS = 5
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
-
-
-def decode_image(contents: bytes) -> np.ndarray:
-    nparr = np.frombuffer(contents, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    if img is None:
-        raise HTTPException(status_code=400, detail="Invalid image file")
-    return img
-
-
-def sanitize_string(value: str, max_length: int = 255) -> str:
-    """Sanitize and truncate string input."""
-    if not value:
-        return ""
-    # Remove leading/trailing whitespace and truncate
-    return value.strip()[:max_length]
 
 
 @router.post("/employees/register", response_model=EmployeeResponse)
@@ -191,7 +176,10 @@ async def re_embed_employee(
         db.commit()
         db.refresh(employee)
         return employee
-    except Exception:
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error re-embedding employee {employee_id}: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail="Internal server error")
 

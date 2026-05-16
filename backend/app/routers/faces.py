@@ -11,18 +11,11 @@ from ..deps import get_face_service
 from ..models import Admin, AppSettings, Employee
 from ..services.embedding import deserialize_embedding
 from ..services.face_service import FaceRecognitionService
+from ..utils import decode_image
 
 router = APIRouter(prefix="/api/v1", tags=["faces"])
 
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
-
-
-def decode_image(contents: bytes) -> np.ndarray:
-    nparr = np.frombuffer(contents, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    if img is None:
-        raise HTTPException(status_code=400, detail="Invalid image file")
-    return img
 
 
 @router.post("/faces/recognize")
