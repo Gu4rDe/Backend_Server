@@ -1,5 +1,5 @@
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -15,7 +15,7 @@ class InviteService:
         expires_hours: int = 24,
     ) -> AdminInviteCode:
         code = secrets.token_urlsafe(16)[:16]
-        expires_at = datetime.utcnow() + timedelta(hours=expires_hours)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=expires_hours)
 
         invite_code = AdminInviteCode(
             code=code,
@@ -36,7 +36,7 @@ class InviteService:
             return None
         if invite_code.is_used:
             return None
-        if invite_code.expires_at and invite_code.expires_at < datetime.utcnow():
+        if invite_code.expires_at and invite_code.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
             return None
         return invite_code
 
@@ -58,5 +58,5 @@ class InviteService:
     @staticmethod
     def mark_as_used(db: Session, invite_code: AdminInviteCode) -> None:
         invite_code.is_used = True
-        invite_code.used_at = datetime.utcnow()
+        invite_code.used_at = datetime.now(timezone.utc)
         db.commit()
