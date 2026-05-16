@@ -1,6 +1,6 @@
 import os
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -100,18 +100,9 @@ async def create_invite_code(
     db: Annotated[Session, Depends(get_db)],
     current_admin: Annotated[Admin, Depends(get_current_admin)],
 ):
-    code = secrets.token_urlsafe(16)[:16]
-    expires_at = datetime.utcnow() + timedelta(hours=invite_data.expires_hours)
-
-    invite_code = AdminInviteCode(
-        code=code,
-        created_by=current_admin.id,
-        expires_at=expires_at,
+    return InviteService.create_invite_code(
+        db, current_admin.id, invite_data.expires_hours
     )
-    db.add(invite_code)
-    db.commit()
-    db.refresh(invite_code)
-    return invite_code
 
 
 @router.get("/admin/invites", response_model=InviteCodeListResponse)
@@ -119,7 +110,7 @@ async def list_invite_codes(
     db: Annotated[Session, Depends(get_db)],
     current_admin: Annotated[Admin, Depends(get_current_admin)],
 ):
-    codes = db.query(AdminInviteCode).all()
+    codes = InviteService.get_all_codes(db)
     return InviteCodeListResponse(codes=codes, total=len(codes))
 
 
@@ -129,17 +120,14 @@ async def delete_invite_code(
     db: Annotated[Session, Depends(get_db)],
     current_admin: Annotated[Admin, Depends(get_current_admin)],
 ):
-    invite_code = (
-        db.query(AdminInviteCode).filter(AdminInviteCode.id == code_id).first()
-    )
-    if not invite_code:
-        raise HTTPException(status_code=404, detail="Invite code not found")
-
-    if invite_code.is_used:
+    success = InviteService.delete_invite_code(db, code_id)
+    if not success:
+        # Check if it exists at all to return 404 vs 400
+        invite_code = db.query(AdminInviteCode).filter(AdminInviteCode.id == code_id).first()
+        if not invite_code:
+            raise HTTPException(status_code=404, detail="Invite code not found")
         raise HTTPException(status_code=400, detail="Cannot delete used invite code")
 
-    db.delete(invite_code)
-    db.commit()
     return {"message": f"Invite code {code_id} deleted successfully"}
 
 

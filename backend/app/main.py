@@ -18,12 +18,12 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-from .database import ensure_env_file, get_db, init_db
+from .database import ensure_env_file
 
 ensure_env_file()
-
 load_dotenv()
 
+from .database import get_db, init_db
 from .models import AppSettings
 from .routers import admins_router, employees_router, faces_router, settings_router
 from .services.face_service import FaceRecognitionService
@@ -38,12 +38,14 @@ async def lifespan(app: FastAPI):
     init_db()
     logger.info("Database initialized successfully")
 
-    db = next(get_db())
-    if db.query(AppSettings).first() is None:
-        logger.info("Creating default application settings...")
-        db.add(AppSettings())
-        db.commit()
-        logger.info("Default settings created")
+    from .database import SessionLocal
+
+    with SessionLocal() as db:
+        if db.query(AppSettings).first() is None:
+            logger.info("Creating default application settings...")
+            db.add(AppSettings())
+            db.commit()
+            logger.info("Default settings created")
 
     face_service = FaceRecognitionService(model_dir=os.getenv("MODEL_DIR", "models"))
     app.state.face_service = face_service
