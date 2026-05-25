@@ -21,7 +21,7 @@ from ..utils import decode_image, sanitize_string
 
 router = APIRouter(prefix="/api/v1", tags=["employees"])
 
-MIN_PHOTOS = 1
+MIN_PHOTOS = 3
 MAX_PHOTOS = 5
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
 

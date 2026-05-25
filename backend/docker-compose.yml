@@ -11,8 +11,6 @@ services:
       - face-data:/app/data
       - adaface-models:/app/models
       - insightface-cache:/home/appuser/.insightface
-    environment:
-      - DATABASE_URL=sqlite:///./data/faces.db
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

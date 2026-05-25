@@ -53,23 +53,15 @@ async def update_settings(
 
 @router.post("/settings/backup")
 async def create_backup(
-    db: Annotated[Session, Depends(get_db)],
     current_admin: Annotated[Admin, Depends(get_current_admin)],
 ):
-    try:
-        db_path = "data/faces.db"
-        if not os.path.exists(db_path):
-            raise HTTPException(status_code=404, detail="Database file not found")
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = f"data/backup_faces_{timestamp}.db"
-        shutil.copy2(db_path, backup_path)
-
-        return {
-            "message": "Backup created successfully",
-            "backup_path": backup_path,
-        }
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to create backup")
+    db_path = "data/faces.db"
+    if not os.path.exists(db_path):
+        raise HTTPException(status_code=404, detail="Database file not found")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = f"data/backup_faces_{timestamp}.db"
+    shutil.copy2(db_path, backup_path)
+    return {
+        "message": "Backup created successfully",
+        "backup_path": backup_path,
+    }

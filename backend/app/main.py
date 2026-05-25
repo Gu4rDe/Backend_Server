@@ -3,7 +3,6 @@ import os
 from contextlib import asynccontextmanager
 
 import uvicorn
-from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -21,7 +20,6 @@ logger = logging.getLogger(__name__)
 from .database import ensure_env_file
 
 ensure_env_file()
-load_dotenv()
 
 from .database import get_db, init_db
 from .models import AppSettings

@@ -1,17 +1,23 @@
+import base64
 import logging
 import os
 import secrets
 from collections.abc import Generator
 from pathlib import Path
 
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from .models import Base
 
+load_dotenv()
+
 logger = logging.getLogger(__name__)
 
 ENV_FILE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+
+DEFAULT_DATABASE_URL = "sqlite:///./data/faces.db"
 
 
 def ensure_env_file() -> None:
@@ -20,10 +26,12 @@ def ensure_env_file() -> None:
         logger.info(".env file not found, creating new one...")
 
         secret_key = secrets.token_urlsafe(32)
+        encryption_key = base64.b64encode(os.urandom(32)).decode("utf-8")
         invite_code = secrets.token_urlsafe(16)[:16]
         reset_code = secrets.token_urlsafe(16)[:16]
 
         logger.info("Generated SECRET_KEY")
+        logger.info("Generated ENCRYPTION_KEY")
         logger.info("Generated INITIAL_INVITE_CODE: %s", invite_code)
         logger.info("Generated RESET_INVITE_CODE: %s", reset_code)
 
@@ -41,6 +49,11 @@ def ensure_env_file() -> None:
             )
 
             content = content.replace(
+                "ENCRYPTION_KEY=your-encryption-key-base64-change-in-production",
+                f"ENCRYPTION_KEY={encryption_key}",
+            )
+
+            content = content.replace(
                 "INITIAL_INVITE_CODE=\n",
                 f"INITIAL_INVITE_CODE={invite_code}\n",
             )
@@ -55,7 +68,8 @@ def ensure_env_file() -> None:
         else:
             with open(ENV_FILE_PATH, "w") as f:
                 f.write(f"SECRET_KEY={secret_key}\n")
-                f.write("DATABASE_URL=sqlite:///./data/faces.db\n")
+                f.write(f"DATABASE_URL={DEFAULT_DATABASE_URL}\n")
+                f.write(f"ENCRYPTION_KEY={encryption_key}\n")
                 f.write(f"INITIAL_INVITE_CODE={invite_code}\n")
                 f.write(f"RESET_INVITE_CODE={reset_code}\n")
 
@@ -64,11 +78,11 @@ def ensure_env_file() -> None:
         logger.info(".env file already exists, skipping creation")
 
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/faces.db")
+DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
 
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {},
+    connect_args={"check_same_thread": False},
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

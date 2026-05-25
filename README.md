@@ -34,7 +34,7 @@ REST API server for the **Miit_FaceDetect** face recognition system. Built with 
 - **Rate Limiting** — endpoint protection via slowapi
 - **Auto-initialization** — `.env`, database, and default settings created on first launch
 - **Docker** — multi-stage build, healthcheck, insightface model auto-download
-- **Tests** — pytest infrastructure with in-memory SQLite
+- **Tests** — pytest test suite with 50 tests
 
 ## Tech Stack
 
@@ -45,8 +45,7 @@ REST API server for the **Miit_FaceDetect** face recognition system. Built with 
 | Package Manager | uv | — |
 | ORM | SQLAlchemy | 2.0.23 |
 | Migrations | Alembic | 1.13.1 |
-| Database (dev) | SQLite | — |
-| Database (prod) | PostgreSQL | — |
+| Database | SQLite | built-in |
 | Authentication | python-jose + bcrypt | 3.3.0 / 4.0.1 |
 | Encryption | cryptography | >=42.0.0 |
 | Validation | Pydantic | >=2.0 |
@@ -105,11 +104,10 @@ backend/
 │       ├── embedding.py     # Embedding serialization with encryption (float32 → encrypted blob)
 │       └── invite_service.py # Invite code system
 ├── alembic/                 # Database migration scripts
-├── data/                    # SQLite database files (gitignored)
+├── data/                    # Database files (gitignored)
 ├── models/                  # ONNX models (gitignored, adaface_ir101.onnx)
-├── scripts/                 # Utility scripts (AdaFace ONNX conversion)
 ├── tests/                   # pytest test suite
-│   ├── conftest.py          # Test client, in-memory DB, fixtures
+│   ├── conftest.py          # Test client, in-memory SQLite, fixtures
 │   ├── test_admins.py       # Admin endpoint tests
 │   ├── test_health.py       # Health endpoint tests
 │   ├── test_clahe.py        # CLAHE preprocessing tests
@@ -154,14 +152,6 @@ uv sync --group dev   # for testing
 3. **Download insightface models** (for local development)
 
 The `buffalo_l` model pack downloads automatically on first run (~32 MB). For Docker, it's handled by `entrypoint.sh`.
-
-4. **(Optional) Download AdaFace IR-101 model**
-
-```bash
-python scripts/convert_adaface_to_onnx.py
-```
-
-If not provided, the system falls back to insightface's built-in ArcFace R50.
 
 ## Usage
 
@@ -260,7 +250,7 @@ Embeddings are encrypted at rest using **AES-256-GCM** before being stored in th
 | Data type | float32 |
 | Size (raw) | 2048 bytes per embedding |
 | Size (encrypted) | 2077 bytes per embedding (2048 + 29 overhead) |
-| Storage | SQLite LargeBinary (encrypted) |
+| Storage | SQLite BLOB (encrypted) |
 | Legacy support | Auto-detects and converts unencrypted float32/float64 |
 
 ## API Reference
@@ -276,7 +266,7 @@ Embeddings are encrypted at rest using **AES-256-GCM** before being stored in th
 | GET | `/api/v1/admins/me` | Yes | — | `{id, username, email, created_at}` |
 | POST | `/api/v1/admins/reset-password` | — | `{username, invite_code, new_password}` | `200 OK` |
 | POST | `/api/v1/admin/invites` | Yes | `{expires_hours}` | `{id, code, created_by, ...}` |
-| GET | `/api/v1/admin/invites` | Yes | — | `[{InviteCodeResponse}]` |
+| GET | `/api/v1/admin/invites` | Yes | — | `{codes: [{InviteCodeResponse}], total: number}` |
 | DELETE | `/api/v1/admin/invites/{id}` | Yes | — | `200 OK` |
 
 ### Employees
@@ -284,12 +274,12 @@ Embeddings are encrypted at rest using **AES-256-GCM** before being stored in th
 | Method | Endpoint | Auth | Body | Response |
 |--------|----------|------|------|----------|
 | POST | `/api/v1/employees/register` | Yes | Multipart (3-5 images + form) | `{EmployeeResponse}` |
-| POST | `/api/v1/employees/{id}/re-embed` | Yes | Multipart (3-5 images) | `{EmployeeResponse}` |
+| POST | `/api/v1/employees/{employee_id}/re-embed` | Yes | Multipart (3-5 images) | `{EmployeeResponse}` |
 | GET | `/api/v1/employees` | Yes | Query: `skip`, `limit` | `[{EmployeeResponse}]` |
 | GET | `/api/v1/employees/search` | Yes | Query: `q` | `[{EmployeeResponse}]` |
 | GET | `/api/v1/employees/stats` | Yes | — | `{total, active, inactive}` |
-| PUT | `/api/v1/employees/{id}` | Yes | `{EmployeeUpdate}` | `{EmployeeResponse}` |
-| DELETE | `/api/v1/employees/{id}` | Yes | — | `200 OK` |
+| PUT | `/api/v1/employees/{employee_id}` | Yes | `{EmployeeUpdate}` | `{EmployeeResponse}` |
+| DELETE | `/api/v1/employees/{employee_id}` | Yes | — | `200 OK` |
 
 ### Face Recognition
 
@@ -303,7 +293,7 @@ Embeddings are encrypted at rest using **AES-256-GCM** before being stored in th
 |--------|----------|------|------|----------|
 | GET | `/api/v1/settings` | Yes | — | `{AppSettings}` |
 | PUT | `/api/v1/settings` | Yes | `{AppSettingsUpdate}` | `{AppSettings}` |
-| POST | `/api/v1/settings/backup` | Yes | — | File download |
+| POST | `/api/v1/settings/backup` | Yes | — | `{message, backup_path}` |
 
 ### Health Check
 
@@ -323,8 +313,7 @@ Embeddings are encrypted at rest using **AES-256-GCM** before being stored in th
 - **Dynamic match threshold** from AppSettings instead of hardcoded 0.4
 - **Singleton FaceRecognitionService** via app.state instead of two module-level instances
 - **Unified `detect_and_embed()` API** instead of separate `detect_faces()` + `get_face_embedding()`
-- **pytest test suite** with 48 tests
-- **Removed**: MediaPipe, ArcFace ONNX, histogram fallback, `MODEL_DIR` env var
+- **pytest test suite** with 50 tests
 
 ## Contributing
 

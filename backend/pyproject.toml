@@ -1,6 +1,6 @@
 [project]
 name = "backend-site"
-version = "0.1.0"
+version = "5.0.0"
 description = "Face Recognition Backend API"
 requires-python = ">=3.10"
 dependencies = [

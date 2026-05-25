@@ -18,7 +18,7 @@ REST API сервер для системы распознавания лиц **
 - **Ограничение запросов** — защита эндпоинтов через slowapi
 - **Автоинициализация** — `.env`, база данных и настройки по умолчанию создаются при первом запуске
 - **Docker** — многоэтапная сборка, healthcheck, автоматическая загрузка моделей insightface
-- **Тесты** — pytest с in-memory SQLite
+- **Тесты** — pytest — 50 тестов с in-memory SQLite
 
 ## Технологии
 
@@ -29,8 +29,7 @@ REST API сервер для системы распознавания лиц **
 | Менеджер пакетов | uv | — |
 | ORM | SQLAlchemy | 2.0.23 |
 | Миграции | Alembic | 1.13.1 |
-| БД (разработка) | SQLite | — |
-| БД (продакшен) | PostgreSQL | — |
+| БД | SQLite | встроенная |
 | Аутентификация | python-jose + bcrypt | 3.3.0 / 4.0.1 |
 | Шифрование | cryptography | >=42.0.0 |
 | Валидация | Pydantic | >=2.0 |
@@ -76,14 +75,6 @@ uv sync --group dev   # для тестирования
 ```
 
 3. **Модели insightface** скачиваются автоматически при первом запуске (~32 МБ).
-
-4. **(Опционально) Конвертировать AdaFace IR-101:**
-
-```bash
-python scripts/convert_adaface_to_onnx.py
-```
-
-Если не конвертировать, используется ArcFace R50 из buffalo_l.
 
 ## Запуск
 
@@ -175,7 +166,7 @@ uv run alembic downgrade -1                              # Откатить
 | Тип данных | float32 |
 | Размер (без шифрования) | 2048 байт на сотрудника |
 | Размер (с шифрованием) | 2077 байт на сотрудника (2048 + 29 накладных расходов) |
-| Хранение | SQLite LargeBinary (зашифровано) |
+| Хранение | SQLite BLOB (зашифровано) |
 | Обратная совместимость | Автоопределение незашифрованных float32/float64 |
 
 ## API
@@ -191,7 +182,7 @@ uv run alembic downgrade -1                              # Откатить
 | GET | `/api/v1/admins/me` | Да | — | `{id, username, email, created_at}` |
 | POST | `/api/v1/admins/reset-password` | — | `{username, invite_code, new_password}` | `200 OK` |
 | POST | `/api/v1/admin/invites` | Да | `{expires_hours}` | `{id, code, ...}` |
-| GET | `/api/v1/admin/invites` | Да | — | `[{InviteCodeResponse}]` |
+| GET | `/api/v1/admin/invites` | Да | — | `{codes: [{InviteCodeResponse}], total: number}` |
 | DELETE | `/api/v1/admin/invites/{id}` | Да | — | `200 OK` |
 
 ### Сотрудники
@@ -199,12 +190,12 @@ uv run alembic downgrade -1                              # Откатить
 | Метод | Эндпоинт | Авторизация | Описание |
 |-------|----------|-------------|----------|
 | POST | `/api/v1/employees/register` | Да | Регистрация с 3-5 фото |
-| POST | `/api/v1/employees/{id}/re-embed` | Да | Перерегистрация лица (3-5 фото) |
+| POST | `/api/v1/employees/{employee_id}/re-embed` | Да | Перерегистрация лица (3-5 фото) |
 | GET | `/api/v1/employees` | Да | Список сотрудников (пагинация) |
 | GET | `/api/v1/employees/search` | Да | Поиск по имени/должности/отделу |
 | GET | `/api/v1/employees/stats` | Да | Статистика |
-| PUT | `/api/v1/employees/{id}` | Да | Обновление данных |
-| DELETE | `/api/v1/employees/{id}` | Да | Удаление |
+| PUT | `/api/v1/employees/{employee_id}` | Да | Обновление данных |
+| DELETE | `/api/v1/employees/{employee_id}` | Да | Удаление |
 
 ### Распознавание лиц
 
@@ -238,8 +229,7 @@ uv run alembic downgrade -1                              # Откатить
 - **Динамический порог** из настроек вместо хардкода 0.4
 - **Синглтон-сервис** через `app.state` вместо двух отдельных экземпляров
 - **Единый метод `detect_and_embed()`** вместо раздельных `detect_faces()` + `get_face_embedding()`
-- **pytest** — 48 тестов с in-memory SQLite
-- **Удалено**: MediaPipe, ArcFace ONNX, histogram fallback, `MODEL_DIR`
+- **pytest** — 50 тестов с in-memory SQLite
 
 ## Лицензия
 

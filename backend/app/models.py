@@ -10,7 +10,6 @@ from sqlalchemy import (
     Integer,
     LargeBinary,
     String,
-    Text,
     func,
 )
 from sqlalchemy.orm import DeclarativeBase
@@ -23,7 +22,7 @@ class Base(DeclarativeBase):
 class Admin(Base):
     __tablename__ = "admins"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     username = Column(String(50), unique=True, nullable=False, index=True)
     email = Column(String(100), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
@@ -36,7 +35,7 @@ class Admin(Base):
 class AdminInviteCode(Base):
     __tablename__ = "admin_invite_codes"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     code = Column(String(32), unique=True, nullable=False, index=True)
     created_by = Column(Integer, ForeignKey("admins.id", ondelete="CASCADE"), nullable=True)
     used_by = Column(Integer, nullable=True)
@@ -52,7 +51,7 @@ class AdminInviteCode(Base):
 class Employee(Base):
     __tablename__ = "employees"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     employee_id = Column(String(50), default="", index=True)
     username = Column(String(150), nullable=False, index=True)
     email = Column(String(100), default="")
@@ -74,7 +73,7 @@ class Employee(Base):
 class AppSettings(Base):
     __tablename__ = "app_settings"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     theme = Column(String(20), default="dark")
     fullscreen = Column(Boolean, default=False)
     camera_resolution = Column(String(20), default="Full HD")

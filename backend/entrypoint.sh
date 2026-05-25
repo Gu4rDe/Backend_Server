@@ -26,7 +26,6 @@ if [ -f "$ADAFACE_PATH" ]; then
 else
     echo "[WARN] AdaFace model not found at $ADAFACE_PATH"
     echo "[WARN] Face recognition will use insightface default (ArcFace R50) as fallback"
-    echo "[WARN] To use AdaFace IR-101, run: python scripts/convert_adaface_to_onnx.py"
 fi
 
 echo ""

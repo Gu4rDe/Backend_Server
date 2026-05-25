@@ -91,9 +91,8 @@ def test_register_single_photo(client, auth_headers, mock_face):
         data={"username": "user_single"},
         files=files,
     )
-    assert resp.status_code == 200
-    assert resp.json()["username"] == "user_single"
-    assert mock_face.detect_and_embed.call_count == 1
+    assert resp.status_code == 400
+    assert "Minimum 3 photos" in resp.json()["detail"]
 
 
 def test_register_too_many_photos(client, auth_headers):
@@ -234,14 +233,14 @@ def test_re_embed_single_photo(client, auth_headers, mock_face):
     assert reg_resp.status_code == 200
     emp_id = reg_resp.json()["id"]
 
-    files_re = [("files", ("photo.png", io.BytesIO(png), "image/png"))]
+    files_re = [("files", (f"photo{i}.png", io.BytesIO(png), "image/png")) for i in range(3)]
     re_resp = client.post(
         f"/api/v1/employees/{emp_id}/re-embed",
         headers=auth_headers,
         files=files_re,
     )
     assert re_resp.status_code == 200
-    assert mock_face.detect_and_embed.call_count == 4  # 3 register + 1 re-embed
+    assert mock_face.detect_and_embed.call_count == 6  # 3 register + 3 re-embed
 
 
 def test_re_embed_employee_not_found(client, auth_headers, mock_face):
