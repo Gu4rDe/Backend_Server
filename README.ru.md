@@ -35,7 +35,7 @@ REST API сервер для системы распознавания лиц **
 | Валидация | Pydantic | 2.10.0 |
 | Детекция лиц | insightface SCRFD-10GF | 0.7.3 |
 | Распознавание лиц | AdaFace IR-101 / ArcFace R50 | ONNX |
-| Препроцессинг | OpenCV (headless) | 4.8.0 |
+| Препроцессинг | OpenCV (headless) | 4.8.0.76 |
 | Инференс | onnxruntime | 1.16.0 |
 | Ограничение запросов | slowapi | 0.1.9 |
 | Сервер | Uvicorn | 0.24.0 |

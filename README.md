@@ -54,7 +54,7 @@ REST API server for the **Miit_FaceDetect** face recognition system. Built with 
 | Validation | Pydantic | 2.10.0 |
 | Face Detection | insightface SCRFD-10GF | 0.7.3 |
 | Face Recognition | AdaFace IR-101 / ArcFace R50 | ONNX |
-| Preprocessing | OpenCV (headless) | 4.8.0 |
+| Preprocessing | OpenCV (headless) | 4.8.0.76 |
 | Inference | onnxruntime | 1.16.0 |
 | Rate Limiting | slowapi | 0.1.9 |
 | Server | Uvicorn | 0.24.0 |
