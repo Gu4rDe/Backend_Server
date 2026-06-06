@@ -4,7 +4,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com/)
 [![Version](https://img.shields.io/badge/version-5.0.0-orange.svg)]()
 
-[README in English](README.md)
+[English](README.md) | Русский
 
 REST API сервер для системы распознавания лиц **Miit_FaceDetect**. Построен на **FastAPI** и **SQLAlchemy**, обеспечивает аутентификацию администраторов, управление сотрудниками, распознавание лиц через insightface + AdaFace IR-101 и настройки приложения.
 

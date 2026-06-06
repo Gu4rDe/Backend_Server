@@ -6,6 +6,9 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-5.0.0-orange.svg)]()
 
+
+English | [Русский](README.ru.md)
+
 REST API server for the **Miit_FaceDetect** face recognition system. Built with **FastAPI** and **SQLAlchemy**, providing admin authentication, employee management, face recognition via insightface + AdaFace IR-101, and application settings.
 
 ## Table of Contents
