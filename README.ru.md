@@ -24,19 +24,19 @@ REST API сервер для системы распознавания лиц **
 
 | Слой | Технология | Версия |
 |------|------------|---------|
-| Фреймворк | FastAPI | >=0.110.0 |
-| Язык | Python | >=3.10 |
+| Фреймворк | FastAPI | 0.110.0 |
+| Язык | Python | 3.10+ |
 | Менеджер пакетов | uv | — |
 | ORM | SQLAlchemy | 2.0.23 |
 | Миграции | Alembic | 1.13.1 |
 | БД | SQLite | встроенная |
 | Аутентификация | python-jose + bcrypt | 3.3.0 / 4.0.1 |
-| Шифрование | cryptography | >=42.0.0 |
-| Валидация | Pydantic | >=2.0 |
-| Детекция лиц | insightface SCRFD-10GF | >=0.7.3 |
+| Шифрование | cryptography | 42.0.0 |
+| Валидация | Pydantic | 2.10.0 |
+| Детекция лиц | insightface SCRFD-10GF | 0.7.3 |
 | Распознавание лиц | AdaFace IR-101 / ArcFace R50 | ONNX |
-| Препроцессинг | CLAHE (OpenCV) | headless |
-| Инференс | onnxruntime | >=1.16.0 |
+| Препроцессинг | OpenCV (headless) | 4.8.0 |
+| Инференс | onnxruntime | 1.16.0 |
 | Ограничение запросов | slowapi | 0.1.9 |
 | Сервер | Uvicorn | 0.24.0 |
 
