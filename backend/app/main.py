@@ -98,7 +98,14 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "face-recognition-api", "version": "5.0.0"}
+    face_service = getattr(app.state, "face_service", None)
+    face_service_initialized = face_service is not None and face_service._initialized
+    return {
+        "status": "healthy" if face_service_initialized else "degraded",
+        "service": "face-recognition-api",
+        "version": "5.0.0",
+        "face_service_initialized": face_service_initialized,
+    }
 
 
 if __name__ == "__main__":

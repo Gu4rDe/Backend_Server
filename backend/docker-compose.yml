@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     container_name: face-recognition-api
     restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
     ports:
       - "8000:8000"
     volumes:

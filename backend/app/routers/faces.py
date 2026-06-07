@@ -13,6 +13,8 @@ from ..services.embedding import deserialize_embedding
 from ..services.face_service import FaceRecognitionService
 from ..utils import decode_image
 
+SERVICE_UNAVAILABLE_DETAIL = "Сервис распознавания лиц не инициализирован. Попробуйте позже."
+
 router = APIRouter(prefix="/api/v1", tags=["faces"])
 
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
@@ -42,6 +44,8 @@ async def recognize_file(
 
     try:
         face_results = face_service.detect_and_embed(img)
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail=SERVICE_UNAVAILABLE_DETAIL)
 
         if len(face_results) == 0:
             return {

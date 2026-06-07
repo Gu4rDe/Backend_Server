@@ -19,6 +19,8 @@ from ..services.embedding import serialize_embedding, deserialize_embedding
 from ..services.face_service import FaceRecognitionService
 from ..utils import decode_image, sanitize_string
 
+SERVICE_UNAVAILABLE_DETAIL = "Сервис распознавания лиц не инициализирован. Попробуйте позже."
+
 router = APIRouter(prefix="/api/v1", tags=["employees"])
 
 MIN_PHOTOS = 3
@@ -82,7 +84,10 @@ async def register_employee(
         except HTTPException:
             raise HTTPException(status_code=400, detail=f"File {idx + 1} is not a valid image")
 
-        face_results = face_service.detect_and_embed(img)
+        try:
+            face_results = face_service.detect_and_embed(img)
+        except RuntimeError:
+            raise HTTPException(status_code=503, detail=SERVICE_UNAVAILABLE_DETAIL)
         if len(face_results) == 0:
             raise HTTPException(status_code=400, detail=f"No face detected in file {idx + 1}")
         if len(face_results) > 1:
@@ -157,7 +162,10 @@ async def re_embed_employee(
         except HTTPException:
             raise HTTPException(status_code=400, detail=f"File {idx + 1} is not a valid image")
 
-        face_results = face_service.detect_and_embed(img)
+        try:
+            face_results = face_service.detect_and_embed(img)
+        except RuntimeError:
+            raise HTTPException(status_code=503, detail=SERVICE_UNAVAILABLE_DETAIL)
         if len(face_results) == 0:
             raise HTTPException(status_code=400, detail=f"No face detected in file {idx + 1}")
         if len(face_results) > 1:
