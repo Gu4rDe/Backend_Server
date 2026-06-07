@@ -11,7 +11,7 @@ services:
       - "8000:8000"
     volumes:
       - face-data:/app/data
-      - adaface-models:/app/models
+      - models-data:/app/models
       - insightface-cache:/home/appuser/.insightface
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -27,5 +27,5 @@ services:
 
 volumes:
   face-data:
-  adaface-models:
+  models-data:
   insightface-cache:

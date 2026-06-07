@@ -55,7 +55,6 @@ def _make_mock_face_service(detect_side_effect=None):
 
     svc = MagicMock(spec=FaceRecognitionService)
     svc._initialized = True
-    svc._use_insightface = True
     if detect_side_effect:
         svc.detect_and_embed = MagicMock(side_effect=detect_side_effect)
     else:
@@ -92,12 +91,12 @@ def test_register_single_photo(client, auth_headers, mock_face):
         files=files,
     )
     assert resp.status_code == 400
-    assert "Minimum 3 photos" in resp.json()["detail"]
+    assert "Exactly 3" in resp.json()["detail"]
 
 
-def test_register_too_many_photos(client, auth_headers):
+def test_register_wrong_photo_count(client, auth_headers):
     png = _png_bytes()
-    files = [("files", (f"photo{i}.png", io.BytesIO(png), "image/png")) for i in range(6)]
+    files = [("files", (f"photo{i}.png", io.BytesIO(png), "image/png")) for i in range(4)]
     resp = client.post(
         "/api/v1/employees/register",
         headers=auth_headers,
@@ -105,7 +104,7 @@ def test_register_too_many_photos(client, auth_headers):
         files=files,
     )
     assert resp.status_code == 400
-    assert "Maximum 5" in resp.json()["detail"]
+    assert "Exactly 3" in resp.json()["detail"]
 
 
 def test_register_success_3_photos(client, auth_headers, mock_face):
@@ -123,17 +122,7 @@ def test_register_success_3_photos(client, auth_headers, mock_face):
     assert mock_face.detect_and_embed.call_count == 3
 
 
-def test_register_success_5_photos(client, auth_headers, mock_face):
-    png = _png_bytes()
-    files = [("files", (f"photo{i}.png", io.BytesIO(png), "image/png")) for i in range(5)]
-    resp = client.post(
-        "/api/v1/employees/register",
-        headers=auth_headers,
-        data={"username": "user5photos"},
-        files=files,
-    )
-    assert resp.status_code == 200
-    assert mock_face.detect_and_embed.call_count == 5
+
 
 
 def test_register_no_face_in_photo(client, auth_headers):

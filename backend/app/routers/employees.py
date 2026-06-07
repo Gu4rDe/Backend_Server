@@ -23,8 +23,7 @@ SERVICE_UNAVAILABLE_DETAIL = "Сервис распознавания лиц н�
 
 router = APIRouter(prefix="/api/v1", tags=["employees"])
 
-MIN_PHOTOS = 3
-MAX_PHOTOS = 5
+REQUIRED_PHOTOS = 3
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
 
 
@@ -45,10 +44,8 @@ async def register_employee(
     current_admin: Admin = Depends(get_current_admin),
     face_service: FaceRecognitionService = Depends(get_face_service),
 ):
-    if len(files) < MIN_PHOTOS:
-        raise HTTPException(status_code=400, detail=f"Minimum {MIN_PHOTOS} photos required, got {len(files)}")
-    if len(files) > MAX_PHOTOS:
-        raise HTTPException(status_code=400, detail=f"Maximum {MAX_PHOTOS} photos allowed, got {len(files)}")
+    if len(files) != REQUIRED_PHOTOS:
+        raise HTTPException(status_code=400, detail=f"Exactly {REQUIRED_PHOTOS} photos required, got {len(files)}")
 
     username = sanitize_string(username, 150)
     employee_id = sanitize_string(employee_id, 50)
@@ -138,10 +135,8 @@ async def re_embed_employee(
     current_admin: Admin = Depends(get_current_admin),
     face_service: FaceRecognitionService = Depends(get_face_service),
 ):
-    if len(files) < MIN_PHOTOS:
-        raise HTTPException(status_code=400, detail=f"Minimum {MIN_PHOTOS} photos required, got {len(files)}")
-    if len(files) > MAX_PHOTOS:
-        raise HTTPException(status_code=400, detail=f"Maximum {MAX_PHOTOS} photos allowed, got {len(files)}")
+    if len(files) != REQUIRED_PHOTOS:
+        raise HTTPException(status_code=400, detail=f"Exactly {REQUIRED_PHOTOS} photos required, got {len(files)}")
 
     employee = db.query(Employee).filter(Employee.id == employee_id).first()
     if employee is None:

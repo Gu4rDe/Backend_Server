@@ -19,16 +19,7 @@ else
     echo "[INFO] insightface models found at $INSIGHTFACE_DIR"
 fi
 
-# Check AdaFace model
-ADAFACE_PATH="models/adaface_ir101.onnx"
-if [ -f "$ADAFACE_PATH" ]; then
-    echo "[INFO] AdaFace model found at $ADAFACE_PATH"
-else
-    echo "[WARN] AdaFace model not found at $ADAFACE_PATH"
-    echo "[WARN] Face recognition will use insightface default (ArcFace R50) as fallback"
-fi
 
-echo ""
 
 # Check .env file
 if [ ! -f ".env" ]; then

@@ -46,6 +46,8 @@ async def lifespan(app: FastAPI):
             logger.info("Default settings created")
 
     face_service = FaceRecognitionService(model_dir=os.getenv("MODEL_DIR", "models"))
+    if not face_service._initialized:
+        raise RuntimeError("Face recognition service not initialized — cannot start")
     app.state.face_service = face_service
     logger.info(f"Face recognition: {face_service.model_status}")
 
