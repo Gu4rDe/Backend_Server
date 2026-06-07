@@ -6,6 +6,9 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-5.0.0-orange.svg)]()
 
+
+English | [Русский](README.ru.md)
+
 REST API server for the **Miit_FaceDetect** face recognition system. Built with **FastAPI** and **SQLAlchemy**, providing admin authentication, employee management, face recognition via insightface + AdaFace IR-101, and application settings.
 
 ## Table of Contents
@@ -40,19 +43,19 @@ REST API server for the **Miit_FaceDetect** face recognition system. Built with 
 
 | Layer | Technology | Version |
 |-------|------------|---------|
-| Framework | FastAPI | >=0.110.0 |
-| Language | Python | >=3.10 |
+| Framework | FastAPI | 0.110.0 |
+| Language | Python | 3.10+ |
 | Package Manager | uv | — |
 | ORM | SQLAlchemy | 2.0.23 |
 | Migrations | Alembic | 1.13.1 |
 | Database | SQLite | built-in |
 | Authentication | python-jose + bcrypt | 3.3.0 / 4.0.1 |
-| Encryption | cryptography | >=42.0.0 |
-| Validation | Pydantic | >=2.0 |
-| Face Detection | insightface SCRFD-10GF | >=0.7.3 |
+| Encryption | cryptography | 42.0.0 |
+| Validation | Pydantic | 2.10.0 |
+| Face Detection | insightface SCRFD-10GF | 0.7.3 |
 | Face Recognition | AdaFace IR-101 / ArcFace R50 | ONNX |
-| Preprocessing | CLAHE (OpenCV) | headless |
-| Inference | onnxruntime | >=1.16.0 |
+| Preprocessing | OpenCV (headless) | 4.8.0.76 |
+| Inference | onnxruntime | 1.16.0 |
 | Rate Limiting | slowapi | 0.1.9 |
 | Server | Uvicorn | 0.24.0 |
 | Containerization | Docker | python:3.10-slim |

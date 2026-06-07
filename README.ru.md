@@ -4,7 +4,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com/)
 [![Version](https://img.shields.io/badge/version-5.0.0-orange.svg)]()
 
-[README in English](README.md)
+[English](README.md) | Русский
 
 REST API сервер для системы распознавания лиц **Miit_FaceDetect**. Построен на **FastAPI** и **SQLAlchemy**, обеспечивает аутентификацию администраторов, управление сотрудниками, распознавание лиц через insightface + AdaFace IR-101 и настройки приложения.
 
@@ -24,19 +24,19 @@ REST API сервер для системы распознавания лиц **
 
 | Слой | Технология | Версия |
 |------|------------|---------|
-| Фреймворк | FastAPI | >=0.110.0 |
-| Язык | Python | >=3.10 |
+| Фреймворк | FastAPI | 0.110.0 |
+| Язык | Python | 3.10+ |
 | Менеджер пакетов | uv | — |
 | ORM | SQLAlchemy | 2.0.23 |
 | Миграции | Alembic | 1.13.1 |
 | БД | SQLite | встроенная |
 | Аутентификация | python-jose + bcrypt | 3.3.0 / 4.0.1 |
-| Шифрование | cryptography | >=42.0.0 |
-| Валидация | Pydantic | >=2.0 |
-| Детекция лиц | insightface SCRFD-10GF | >=0.7.3 |
+| Шифрование | cryptography | 42.0.0 |
+| Валидация | Pydantic | 2.10.0 |
+| Детекция лиц | insightface SCRFD-10GF | 0.7.3 |
 | Распознавание лиц | AdaFace IR-101 / ArcFace R50 | ONNX |
-| Препроцессинг | CLAHE (OpenCV) | headless |
-| Инференс | onnxruntime | >=1.16.0 |
+| Препроцессинг | OpenCV (headless) | 4.8.0.76 |
+| Инференс | onnxruntime | 1.16.0 |
 | Ограничение запросов | slowapi | 0.1.9 |
 | Сервер | Uvicorn | 0.24.0 |
 
