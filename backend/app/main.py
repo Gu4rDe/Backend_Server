@@ -52,11 +52,21 @@ async def lifespan(app: FastAPI):
     logger.info(f"Face recognition: {face_service.model_status}")
 
     initial_code = os.getenv("INITIAL_INVITE_CODE", "").strip()
-    reset_code = os.getenv("RESET_INVITE_CODE", "").strip()
     if initial_code:
+        from .models import AdminInviteCode
+        with SessionLocal() as db:
+            existing = db.query(AdminInviteCode).filter(AdminInviteCode.code == initial_code).first()
+            if not existing:
+                db.add(AdminInviteCode(code=initial_code, created_by=None, expires_at=None))
+                db.commit()
+                logger.info("Initial invite code seeded into database")
+            else:
+                logger.info("Initial invite code already exists in database")
         logger.info(f"Initial invite code: {initial_code}")
     else:
         logger.warning("INITIAL_INVITE_CODE not set — registration is closed")
+
+    reset_code = os.getenv("RESET_INVITE_CODE", "").strip()
     if reset_code:
         logger.info(f"Reset invite code: {reset_code}")
     else:

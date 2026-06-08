@@ -40,6 +40,15 @@ app.dependency_overrides[get_db] = override_get_db
 @pytest.fixture(autouse=True)
 def setup_database():
     Base.metadata.create_all(bind=test_engine)
+    db = TestSessionLocal()
+    invite_code = os.environ.get("INITIAL_INVITE_CODE", "")
+    if invite_code:
+        from app.models import AdminInviteCode
+        existing = db.query(AdminInviteCode).filter(AdminInviteCode.code == invite_code).first()
+        if not existing:
+            db.add(AdminInviteCode(code=invite_code, created_by=None, expires_at=None))
+            db.commit()
+    db.close()
     yield
     Base.metadata.drop_all(bind=test_engine)
 
