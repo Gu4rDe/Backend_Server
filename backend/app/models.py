@@ -12,7 +12,7 @@ from sqlalchemy import (
     String,
     func,
 )
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, relationship
 
 
 class Base(DeclarativeBase):
@@ -68,6 +68,22 @@ class Employee(Base):
 
     def __repr__(self) -> str:
         return f"<Employee(id={self.id}, username='{self.username}')>"
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True)
+    token_hash = Column(String(255), nullable=False, index=True)
+    admin_id = Column(Integer, ForeignKey("admins.id", ondelete="CASCADE"), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    is_used = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+    admin = relationship("Admin", backref="reset_tokens")
+
+    def __repr__(self) -> str:
+        return f"<PasswordResetToken(id={self.id}, admin_id={self.admin_id}, is_used={self.is_used})>"
 
 
 class AppSettings(Base):

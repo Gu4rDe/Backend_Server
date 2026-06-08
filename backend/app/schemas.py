@@ -154,15 +154,26 @@ class InviteCodeListResponse(BaseModel):
     total: int
 
 
-class AdminPasswordReset(BaseModel):
-    username: str = Field(..., min_length=3, max_length=50)
-    invite_code: str = Field(..., min_length=8, max_length=32)
-    new_password: str = Field(..., min_length=6, max_length=128)
+class ForgotPasswordRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=100)
 
     @field_validator("username")
     @classmethod
     def validate_username(cls, v: str) -> str:
         return v.strip()
+
+
+class VerifyResetTokenRequest(BaseModel):
+    token: str = Field(..., min_length=8, max_length=8)
+
+
+class VerifyResetTokenResponse(BaseModel):
+    valid: bool
+
+
+class AdminPasswordReset(BaseModel):
+    token: str = Field(..., min_length=8, max_length=8)
+    new_password: str = Field(..., min_length=6, max_length=128)
 
 
 class MessageResponse(BaseModel):

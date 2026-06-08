@@ -28,12 +28,10 @@ def ensure_env_file() -> None:
         secret_key = secrets.token_urlsafe(32)
         encryption_key = base64.b64encode(os.urandom(32)).decode("utf-8")
         invite_code = secrets.token_urlsafe(16)[:16]
-        reset_code = secrets.token_urlsafe(16)[:16]
 
         logger.info("Generated SECRET_KEY")
         logger.info("Generated ENCRYPTION_KEY")
         logger.info("Generated INITIAL_INVITE_CODE: %s", invite_code)
-        logger.info("Generated RESET_INVITE_CODE: %s", reset_code)
 
         example_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), ".env.example"
@@ -58,11 +56,6 @@ def ensure_env_file() -> None:
                 f"INITIAL_INVITE_CODE={invite_code}\n",
             )
 
-            content = content.replace(
-                "RESET_INVITE_CODE=\n",
-                f"RESET_INVITE_CODE={reset_code}\n",
-            )
-
             with open(ENV_FILE_PATH, "w") as f:
                 f.write(content)
         else:
@@ -71,7 +64,12 @@ def ensure_env_file() -> None:
                 f.write(f"DATABASE_URL={DEFAULT_DATABASE_URL}\n")
                 f.write(f"ENCRYPTION_KEY={encryption_key}\n")
                 f.write(f"INITIAL_INVITE_CODE={invite_code}\n")
-                f.write(f"RESET_INVITE_CODE={reset_code}\n")
+                f.write("SMTP_HOST=smtp.yandex.ru\n")
+                f.write("SMTP_PORT=587\n")
+                f.write("SMTP_USER=\n")
+                f.write("SMTP_PASSWORD=\n")
+                f.write("SMTP_FROM=noreply@example.com\n")
+                f.write("FRONTEND_URL=http://localhost:3000\n")
 
         logger.info("Created .env file at %s", ENV_FILE_PATH)
     else:

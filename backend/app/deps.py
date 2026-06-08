@@ -15,3 +15,7 @@ def get_face_service(request: Request):
         service = FaceRecognitionService(model_dir=model_dir)
         request.app.state.face_service = service
     return service
+
+
+def get_email_service(request: Request):
+    return request.app.state.email_service

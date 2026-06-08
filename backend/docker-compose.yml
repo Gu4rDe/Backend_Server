@@ -9,6 +9,8 @@ services:
       - seccomp:unconfined
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     volumes:
       - face-data:/app/data
       - models-data:/app/models

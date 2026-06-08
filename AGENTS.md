@@ -27,7 +27,10 @@ uv sync --group dev        # установить + dev-зависимости (
 ## Окружение и секреты
 
 - `.env` **создаётся автоматически** при первом запуске — никогда не создавайте его вручную
-- `SECRET_KEY`, `ENCRYPTION_KEY`, `INITIAL_INVITE_CODE`, `RESET_INVITE_CODE` генерируются и логируются при старте
+- `SECRET_KEY`, `ENCRYPTION_KEY`, `INITIAL_INVITE_CODE` генерируются и логируются при старте
+- `SMTP_HOST` по умолчанию `smtp.yandex.ru` — для отправки писем сброса пароля
+- Если `SMTP_USER` пустой, почта отключена (эндпоинт возвращает 200, но логирует ошибку)
+- `FRONTEND_URL` — базовый URL фронтенда для ссылок сброса пароля
 - **Смена `ENCRYPTION_KEY` делает все хранимые эмбеддинги нечитаемыми** — пути миграции нет
 - Тестовые фикстуры в `tests/conftest.py` устанавливают все env-переменные до импорта `app.main`
 
@@ -38,10 +41,10 @@ backend/
   app/
     main.py              # FastAPI-приложение, lifespan, middleware
     database.py          # SQLAlchemy-сессия, инициализация БД, авто-создание .env
-    models.py            # SQLAlchemy-модели (Admin, Employee, AppSettings, AdminInviteCode)
+    models.py            # SQLAlchemy-модели (Admin, Employee, AppSettings, AdminInviteCode, PasswordResetToken)
     schemas.py           # Pydantic-схемы запросов/ответов
     auth.py              # JWT (HS256, срок 24ч) + bcrypt
-    deps.py               # FastAPI-зависимости (get_face_service-синглтон, get_current_admin)
+    deps.py               # FastAPI-зависимости (get_face_service, get_email_service, get_current_admin)
     utils.py             # Декодирование изображений, sanitize строк
     routers/             # HTTP-эндпоинты (admins, employees, faces, settings)
     services/
@@ -49,6 +52,10 @@ backend/
       crypto.py          # AES-256-GCM шифрование/расшифровка эмбеддингов
       embedding.py       # Сериализация эмбеддингов (float32 → зашифрованный blob)
       invite_service.py  # CRUD для пригласительных кодов
+      email_service.py   # Отправка email (fastapi-mail, SMTP)
+      token_service.py   # Генерация/валидация токенов сброса пароля
+  templates/
+    reset_email.html     # HTML-шаблон письма для сброса пароля
   alembic/               # Миграции БД
   tests/                 # pytest (in-memory SQLite, модели не нужны)
   data/                  # SQLite-база (в .gitignore)
@@ -92,7 +99,7 @@ uv run alembic downgrade -1                       # откатить
 
 - Python `>=3.10,<3.13`
 - Регистрация лица сотрудника требует ровно 3 фото; эмбеддинги усредняются (mean + L2-norm)
-- Rate limiting: регистрация (5/мин), логин (10/мин) через slowapi
+- Rate limiting: регистрация (5/мин), логин (10/мин), forgot-password (3/мин) через slowapi; также кулдаун 5 мин на отправку писем сброса пароля одному пользователю (per-user, проверка в TokenService.is_rate_limited)
 - JWT-токены используют `id` администратора как `"sub"` (строка)
 - Префикс API: `/api/v1/` для всех эндпоинтов, `/health` и `/` — без авторизации
 

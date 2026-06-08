@@ -24,6 +24,7 @@ ensure_env_file()
 from .database import get_db, init_db
 from .models import AppSettings
 from .routers import admins_router, employees_router, faces_router, settings_router
+from .services.email_service import EmailService
 from .services.face_service import FaceRecognitionService
 
 # Initialize rate limiter
@@ -51,16 +52,28 @@ async def lifespan(app: FastAPI):
     app.state.face_service = face_service
     logger.info(f"Face recognition: {face_service.model_status}")
 
+    email_service = EmailService()
+    app.state.email_service = email_service
+
     initial_code = os.getenv("INITIAL_INVITE_CODE", "").strip()
-    reset_code = os.getenv("RESET_INVITE_CODE", "").strip()
     if initial_code:
-        logger.info(f"Initial invite code: {initial_code}")
+        from .models import AdminInviteCode
+        with SessionLocal() as db:
+            existing = db.query(AdminInviteCode).filter(AdminInviteCode.code == initial_code).first()
+            if not existing:
+                db.add(AdminInviteCode(code=initial_code, created_by=None, expires_at=None))
+                db.commit()
+                logger.info("Initial invite code seeded into database")
+            else:
+                logger.info("Initial invite code already exists in database")
+        logger.info("Initial invite code is set and seeded")
     else:
         logger.warning("INITIAL_INVITE_CODE not set — registration is closed")
-    if reset_code:
-        logger.info(f"Reset invite code: {reset_code}")
+
+    if email_service.is_configured:
+        logger.info("Email service configured and ready")
     else:
-        logger.warning("RESET_INVITE_CODE not set — password reset is disabled")
+        logger.warning("Email service not configured — password reset emails will not be sent")
 
     logger.info("Face Recognition API starting up...")
     yield

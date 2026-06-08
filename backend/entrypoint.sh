@@ -27,19 +27,22 @@ if [ ! -f ".env" ]; then
     SECRET_KEY=$(.venv/bin/python -c "import secrets; print(secrets.token_urlsafe(32))")
     ENCRYPTION_KEY=$(.venv/bin/python -c "from app.services.crypto import generate_encryption_key; print(generate_encryption_key())")
     INITIAL_CODE=$(.venv/bin/python -c "import secrets; print(secrets.token_urlsafe(16))")
-    RESET_CODE=$(.venv/bin/python -c "import secrets; print(secrets.token_urlsafe(16))")
 
     cat > .env << EOF
 DATABASE_URL=sqlite:///./data/faces.db
 SECRET_KEY=${SECRET_KEY}
 ENCRYPTION_KEY=${ENCRYPTION_KEY}
 INITIAL_INVITE_CODE=${INITIAL_CODE}
-RESET_INVITE_CODE=${RESET_CODE}
+SMTP_HOST=smtp.yandex.ru
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASSWORD=
+SMTP_FROM=noreply@example.com
+FRONTEND_URL=http://localhost:3000
 EOF
 
     echo "[INFO] .env file created with generated secrets"
     echo "[INFO] INITIAL_INVITE_CODE: ${INITIAL_CODE}"
-    echo "[INFO] RESET_INVITE_CODE: ${RESET_CODE}"
 else
     echo "[INFO] .env file found"
 fi

@@ -4,12 +4,11 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com/)
 [![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0.23-red.svg)](https://www.sqlalchemy.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-5.0.0-orange.svg)]()
-
+[![Version](https://img.shields.io/badge/version-6.0.0-orange.svg)]()
 
 English | [Русский](README.ru.md)
 
-REST API server for the **Miit_FaceDetect** face recognition system. Built with **FastAPI** and **SQLAlchemy**, providing admin authentication, employee management, face recognition via insightface + AdaFace IR-101, and application settings.
+REST API server for the **Miit_FaceDetect** face recognition system. Built with **FastAPI** and **SQLAlchemy**, providing admin authentication, employee management, face recognition via insightface buffalo_l, and application settings.
 
 ## Table of Contents
 
@@ -28,16 +27,17 @@ REST API server for the **Miit_FaceDetect** face recognition system. Built with 
 
 ## Features
 
-- **Admin Authentication** — login, registration with invite codes, password reset, JWT Bearer tokens
+- **Admin Authentication** — login, registration with invite codes, email-based password reset, JWT Bearer tokens
 - **Employee Management** — CRUD operations, pagination, search, statistics
-- **Face Recognition** — insightface SCRFD detector + AdaFace IR-101 (512-dim float32 embeddings), CLAHE preprocessing, 5-point face alignment, multi-photo registration (3-5 photos with embedding averaging)
+- **Face Recognition** — insightface buffalo_l (SCRFD-10GF detector + ArcFace R50, 512-dim float32 embeddings), CLAHE preprocessing, 5-point face alignment, registration with exactly 3 photos (embedding averaging)
 - **Embedding Encryption** — AES-256-GCM encryption at rest with backward-compatible deserialization
 - **Face Detection** — SCRFD-10GF with confidence threshold, automatic landmark detection
+- **Email Password Reset** — token-based reset with SMTP (Yandex by default), 5-minute cooldown per user
 - **Application Settings** — runtime configuration of match threshold, camera, notifications
 - **Rate Limiting** — endpoint protection via slowapi
 - **Auto-initialization** — `.env`, database, and default settings created on first launch
 - **Docker** — multi-stage build, healthcheck, insightface model auto-download
-- **Tests** — pytest test suite with 50 tests
+- **Tests** — pytest test suite with 54 tests
 
 ## Tech Stack
 
@@ -53,9 +53,10 @@ REST API server for the **Miit_FaceDetect** face recognition system. Built with 
 | Encryption | cryptography | 42.0.0 |
 | Validation | Pydantic | 2.10.0 |
 | Face Detection | insightface SCRFD-10GF | 0.7.3 |
-| Face Recognition | AdaFace IR-101 / ArcFace R50 | ONNX |
+| Face Recognition | insightface ArcFace R50 | buffalo_l |
+| Inference | onnxruntime | 1.23.2 |
 | Preprocessing | OpenCV (headless) | 4.8.0.76 |
-| Inference | onnxruntime | 1.16.0 |
+| Email | fastapi-mail | 1.4.0+ |
 | Rate Limiting | slowapi | 0.1.9 |
 | Server | Uvicorn | 0.24.0 |
 | Containerization | Docker | python:3.10-slim |
@@ -68,7 +69,7 @@ Client ──▶ Routers ──▶ Services ──▶ Database
                     ┌───────▼───────┐
                     │  insightface   │
                     │  (SCRFD +      │
-                    │  AdaFace/ArcR50)│
+                    │  ArcFace R50)  │
                     └───────────────┘
 ```
 
@@ -84,6 +85,7 @@ Client ──▶ Routers ──▶ Services ──▶ Database
 - **CLAHE preprocessing** — applied to full image before detection for low-light enhancement
 - **float32 embeddings** — 2048 bytes each, encrypted at rest with AES-256-GCM, with safe deserialization helper for legacy float64
 - **Dynamic threshold** — match threshold from `AppSettings` instead of hardcoded value
+- **Email-based password reset** — stateful tokens stored in DB, single-use, 1-hour expiration, 5-minute cooldown between emails
 
 ## Project Structure
 
@@ -92,38 +94,42 @@ backend/
 ├── app/
 │   ├── main.py              # FastAPI entry point, lifespan, middleware
 │   ├── database.py          # SQLAlchemy session & DB initialization
-│   ├── models.py            # SQLAlchemy models (Admin, Employee, AppSettings)
+│   ├── models.py            # SQLAlchemy models (Admin, Employee, AppSettings, AdminInviteCode, PasswordResetToken)
 │   ├── schemas.py           # Pydantic request/response schemas
 │   ├── auth.py              # JWT authentication utilities
-│   ├── deps.py              # FastAPI dependencies (get_current_admin, get_face_service)
+│   ├── deps.py              # FastAPI dependencies (get_current_admin, get_face_service, get_email_service)
+│   ├── utils.py             # Image decoding, string sanitization
 │   ├── routers/
-│   │   ├── admins.py        # Admin registration, login, password reset
-│   │   ├── employees.py     # Employee CRUD + face registration
+│   │   ├── admins.py        # Admin registration, login, password reset, invite codes
+│   │   ├── employees.py     # Employee CRUD + face registration (exactly 3 photos)
 │   │   ├── faces.py         # Face recognition endpoint
 │   │   └── settings.py      # Application settings management
 │   └── services/
-│       ├── face_service.py  # Face recognition pipeline (insightface + AdaFace)
+│       ├── face_service.py  # Face recognition pipeline (insightface buffalo_l)
 │       ├── crypto.py        # AES-256-GCM encryption/decryption for embeddings
 │       ├── embedding.py     # Embedding serialization with encryption (float32 → encrypted blob)
-│       └── invite_service.py # Invite code system
+│       ├── invite_service.py # Invite code system
+│       ├── email_service.py # Email sending (fastapi-mail, SMTP)
+│       └── token_service.py # Password reset token generation/validation
+├── templates/
+│   └── reset_email.html     # HTML email template for password reset
 ├── alembic/                 # Database migration scripts
 ├── data/                    # Database files (gitignored)
-├── models/                  # ONNX models (gitignored, adaface_ir101.onnx)
 ├── tests/                   # pytest test suite
 │   ├── conftest.py          # Test client, in-memory SQLite, fixtures
 │   ├── test_admins.py       # Admin endpoint tests
 │   ├── test_health.py       # Health endpoint tests
 │   ├── test_clahe.py        # CLAHE preprocessing tests
 │   ├── test_embedding.py    # Embedding encryption/serialization tests
-│   ├── test_crypto.py        # AES-256-GCM encryption tests
-│   ├── test_employees.py     # Multi-photo registration tests
+│   ├── test_crypto.py       # AES-256-GCM encryption tests
+│   ├── test_employees.py    # Multi-photo registration tests
 │   └── test_singleton.py    # Service singleton test
 ├── Dockerfile               # Multi-stage Docker build
 ├── docker-compose.yml       # Docker Compose configuration
 ├── entrypoint.sh            # Docker entrypoint (insightface model download)
 ├── pyproject.toml           # Project dependencies
 ├── .env.example             # Environment variables template
-├── MODELS.md                # Face recognition model documentation
+├── MODELS.md               # Face recognition model documentation
 └── BACKEND_SETUP.md         # Deployment guide (Russian)
 ```
 
@@ -131,7 +137,7 @@ backend/
 
 | Requirement | Version | Notes |
 |-------------|---------|-------|
-| Python | 3.10+ | Required for runtime |
+| Python | 3.10+ (<3.13) | Required for runtime |
 | uv | — | Package manager (`pip install uv`) |
 | C++ compiler | — | Required for insightface Cython extension (MSVC on Windows, gcc/g++ on Linux) |
 | Docker | — | Optional, for containerized deployment |
@@ -217,8 +223,17 @@ uv run alembic downgrade -1
 | `ENCRYPTION_KEY` | AES-256-GCM key for embedding encryption (base64) | auto-generated |
 | `DATABASE_URL` | Database connection URL | `sqlite:///./data/faces.db` |
 | `INITIAL_INVITE_CODE` | First admin registration code | auto-generated |
-| `RESET_INVITE_CODE` | Admin password reset code | — |
+| `SMTP_HOST` | SMTP server for password reset emails | `smtp.yandex.ru` |
+| `SMTP_PORT` | SMTP server port | `587` |
+| `SMTP_USER` | SMTP login (full email address) | — |
+| `SMTP_PASSWORD` | SMTP password (or app password) | — |
+| `SMTP_FROM` | Sender email address | `noreply@example.com` |
+| `FRONTEND_URL` | Frontend URL for reset password links | `http://localhost:3000` |
 | `CORS_ORIGINS` | Allowed CORS origins | `*` |
+
+> **Note:** If `SMTP_HOST` or `SMTP_USER` is empty, password reset emails will not be sent. The `/forgot-password` endpoint will still return 200 but log an error.
+
+> **Warning:** Changing `ENCRYPTION_KEY` makes existing embeddings unreadable. Keep it safe and backed up.
 
 ### Face Recognition Pipeline
 
@@ -227,7 +242,7 @@ uv run alembic downgrade -1
 | 1. Preprocessing | CLAHE | BGR→LAB, clipLimit=2.0, tileGridSize=(8,8) |
 | 2. Detection | SCRFD-10GF | 5-point landmarks, confidence threshold |
 | 3. Alignment | norm_crop | 5-point similarity transform → 112×112 |
-| 4. Recognition | AdaFace IR-101 / ArcFace R50 | 512-dim float32 embedding |
+| 4. Recognition | ArcFace R50 | 512-dim float32 embedding |
 | 5. Comparison | Cosine similarity | Matrix-vector multiply, threshold from settings |
 
 ### Embedding Encryption
@@ -242,8 +257,6 @@ Embeddings are encrypted at rest using **AES-256-GCM** before being stored in th
 | Format | `[0x01 version][12B nonce][ciphertext + 16B GCM tag]` |
 | Overhead | 29 bytes per embedding (1 + 12 + 16) |
 | Backward compatibility | Legacy unencrypted float32/float64 embeddings auto-detected by absence of `0x01` prefix |
-
-> **Note:** Changing `ENCRYPTION_KEY` makes existing embeddings unreadable. Keep it safe and backed up.
 
 ### Embedding Format
 
@@ -267,7 +280,8 @@ Embeddings are encrypted at rest using **AES-256-GCM** before being stored in th
 | POST | `/api/v1/admins/register` | — | `{username, email, password, invite_code}` | `{id, username, email, created_at}` |
 | POST | `/api/v1/admins/login` | — | `{username, password}` | `{access_token, token_type}` |
 | GET | `/api/v1/admins/me` | Yes | — | `{id, username, email, created_at}` |
-| POST | `/api/v1/admins/reset-password` | — | `{username, invite_code, new_password}` | `200 OK` |
+| POST | `/api/v1/admins/forgot-password` | — | `{username}` | `{message}` (200, no username enumeration) |
+| POST | `/api/v1/admins/reset-password` | — | `{token, new_password}` | `{message}` |
 | POST | `/api/v1/admin/invites` | Yes | `{expires_hours}` | `{id, code, created_by, ...}` |
 | GET | `/api/v1/admin/invites` | Yes | — | `{codes: [{InviteCodeResponse}], total: number}` |
 | DELETE | `/api/v1/admin/invites/{id}` | Yes | — | `200 OK` |
@@ -276,8 +290,8 @@ Embeddings are encrypted at rest using **AES-256-GCM** before being stored in th
 
 | Method | Endpoint | Auth | Body | Response |
 |--------|----------|------|------|----------|
-| POST | `/api/v1/employees/register` | Yes | Multipart (3-5 images + form) | `{EmployeeResponse}` |
-| POST | `/api/v1/employees/{employee_id}/re-embed` | Yes | Multipart (3-5 images) | `{EmployeeResponse}` |
+| POST | `/api/v1/employees/register` | Yes | Multipart (exactly 3 images + form) | `{EmployeeResponse}` |
+| POST | `/api/v1/employees/{employee_id}/re-embed` | Yes | Multipart (exactly 3 images) | `{EmployeeResponse}` |
 | GET | `/api/v1/employees` | Yes | Query: `skip`, `limit` | `[{EmployeeResponse}]` |
 | GET | `/api/v1/employees/search` | Yes | Query: `q` | `[{EmployeeResponse}]` |
 | GET | `/api/v1/employees/stats` | Yes | — | `{total, active, inactive}` |
@@ -305,18 +319,16 @@ Embeddings are encrypted at rest using **AES-256-GCM** before being stored in th
 | GET | `/health` | — | `{status: "healthy", service, version}` |
 | GET | `/` | — | `{message}` |
 
-## Changelog — v5.0.0
+## Testing
 
-- **insightface + AdaFace IR-101** replaces MediaPipe + ArcFace
-- **Multi-photo registration** — 3-5 photos per employee, embeddings averaged (mean + L2-norm)
-- **Re-embed endpoint** — `POST /employees/{id}/re-embed` to update face embeddings
-- **Embedding encryption** — AES-256-GCM at rest, with backward-compatible legacy deserialization
-- **CLAHE preprocessing** for low-light face detection
-- **float32 embeddings** instead of float64 (half the storage)
-- **Dynamic match threshold** from AppSettings instead of hardcoded 0.4
-- **Singleton FaceRecognitionService** via app.state instead of two module-level instances
-- **Unified `detect_and_embed()` API** instead of separate `detect_faces()` + `get_face_embedding()`
-- **pytest test suite** with 50 tests
+```bash
+uv run pytest tests/ -v
+```
+
+- In-memory SQLite with `StaticPool` — no file database needed
+- insightface models are not required for tests
+- `conftest.py` sets all env vars before any `app.*` import
+- 54 tests total
 
 ## Contributing
 
